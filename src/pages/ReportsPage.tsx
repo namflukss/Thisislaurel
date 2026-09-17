@@ -336,6 +336,7 @@ export default function ReportsPage({ ym }: { ym: string }) {
                   <tr key={t.categoryId}>
                     <td>
                       <span className="name-cell">
+                        {c?.color && <i className="swatch" style={{ background: c.color }} />}
                         <span className="emoji">{c?.emoji}</span>
                         {c?.name ?? 'ללא קטגוריה'}
                       </span>

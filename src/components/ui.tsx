@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { addMonths, monthLabel } from '../lib/dates';
+import { PALETTE } from '../lib/colors';
 
 export function Card({
   title,
@@ -98,6 +99,27 @@ export function Field({
         <span className="field-label">{label}</span>
         {children}
       </label>
+      {hint && <span className="hint">{hint}</span>}
+    </div>
+  );
+}
+
+/** כמו Field, אבל לתוכן שאינו פקד יחיד (קבוצת כפתורים, בורר צבע) */
+export function FieldGroup({
+  label,
+  hint,
+  children,
+  full,
+}: {
+  label: React.ReactNode;
+  hint?: React.ReactNode;
+  children: React.ReactNode;
+  full?: boolean;
+}) {
+  return (
+    <div className={`field${full ? ' full' : ''}`} role="group" aria-label={typeof label === 'string' ? label : undefined}>
+      <span className="field-label">{label}</span>
+      {children}
       {hint && <span className="hint">{hint}</span>}
     </div>
   );
@@ -222,6 +244,61 @@ export function Toggle({
           {o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * בחירת צבע: לוח צבעים מוכן (גוונים שנבדקו לניגודיות ולהבחנה בעיוורון צבעים),
+ * אפשרות לצבע חופשי, וחזרה לברירת המחדל.
+ */
+export function ColorPicker({
+  value,
+  onChange,
+  defaultSwatch,
+  defaultLabel = 'ברירת מחדל',
+}: {
+  value?: string;
+  onChange: (color?: string) => void;
+  /** הצבע שמוצג כשלא נבחר צבע מותאם */
+  defaultSwatch?: string;
+  defaultLabel?: string;
+}) {
+  const custom = value && !PALETTE.some((p) => p.hex.toLowerCase() === value.toLowerCase());
+  return (
+    <div className="color-picker">
+      <button
+        type="button"
+        className={`color-chip${!value ? ' selected' : ''}`}
+        onClick={() => onChange(undefined)}
+        title={defaultLabel}
+        aria-label={defaultLabel}
+        aria-pressed={!value}
+      >
+        <i style={{ background: defaultSwatch ?? 'var(--text-muted)' }} />
+      </button>
+      {PALETTE.map((p) => (
+        <button
+          key={p.hex}
+          type="button"
+          className={`color-chip${value?.toLowerCase() === p.hex.toLowerCase() ? ' selected' : ''}`}
+          onClick={() => onChange(p.hex)}
+          title={p.name}
+          aria-label={p.name}
+          aria-pressed={value?.toLowerCase() === p.hex.toLowerCase()}
+        >
+          <i style={{ background: p.hex }} />
+        </button>
+      ))}
+      <label className={`color-chip custom${custom ? ' selected' : ''}`} title="צבע חופשי">
+        <i style={{ background: custom ? value : 'linear-gradient(135deg,#e34948,#eda100,#1baf7a,#2a78d6,#4a3aa7)' }} />
+        <input
+          type="color"
+          value={value ?? '#2a78d6'}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label="בחירת צבע חופשי"
+        />
+      </label>
     </div>
   );
 }

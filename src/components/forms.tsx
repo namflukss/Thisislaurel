@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Account, Category, Recurring, Txn } from '../types';
-import { Field } from './ui';
+import { ColorPicker, Field, FieldGroup } from './ui';
 import { useStore, newId } from '../lib/store';
 import { todayISO } from '../lib/dates';
 import { FREQUENCY_LABEL } from '../lib/compute';
@@ -439,7 +439,10 @@ export function CategoryForm({ initial, onDone }: { initial?: Category; onDone: 
             }
           />
         </Field>
-        <Field label="סמל" full>
+        <FieldGroup label="צבע" hint="משמש בגרף הקטגוריות וברשימות. ברירת מחדל = גוון לפי גודל ההוצאה" full>
+          <ColorPicker value={form.color} onChange={(color) => set('color', color)} />
+        </FieldGroup>
+        <FieldGroup label="סמל" full>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {EMOJIS.map((em) => (
               <button
@@ -457,7 +460,7 @@ export function CategoryForm({ initial, onDone }: { initial?: Category; onDone: 
               </button>
             ))}
           </div>
-        </Field>
+        </FieldGroup>
       </div>
       <div className="modal-actions">
         <button type="submit" className="btn primary">

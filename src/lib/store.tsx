@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import type { Account, AppState, Category, Override, Recurring, Settings, Txn } from '../types';
+import type { Account, AppState, Category, Override, Person, Recurring, Settings, Txn } from '../types';
 import { buildSeedState, emptyState } from '../data/seed';
 import { overrideKey } from './compute';
 import { getSharedDoc, type DocRef } from './platform';
@@ -7,7 +7,7 @@ import { getSharedDoc, type DocRef } from './platform';
 const STORAGE_KEY = 'household-budget:v1';
 
 export type Action =
-  | { type: 'person/rename'; id: string; name: string }
+  | { type: 'person/update'; id: string; patch: Partial<Person> }
   | { type: 'account/save'; account: Account }
   | { type: 'account/delete'; id: string }
   | { type: 'category/save'; category: Category }
@@ -32,10 +32,10 @@ function upsert<T extends { id: string }>(list: T[], item: T): T[] {
 
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
-    case 'person/rename':
+    case 'person/update':
       return {
         ...state,
-        persons: state.persons.map((p) => (p.id === action.id ? { ...p, name: action.name } : p)),
+        persons: state.persons.map((p) => (p.id === action.id ? { ...p, ...action.patch } : p)),
       };
     case 'account/save':
       return { ...state, accounts: upsert(state.accounts, action.account) };
@@ -214,6 +214,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (theme === 'auto') root.removeAttribute('data-theme');
     else root.setAttribute('data-theme', theme);
   }, [state.settings.theme]);
+
+  // צבע ראשי מותאם אישית; ריק = הטוקנים מגיליון הסגנונות, שמתאימים את עצמם לנושא
+  useEffect(() => {
+    const root = document.documentElement;
+    const accent = state.settings.accent;
+    if (accent) {
+      root.style.setProperty('--accent', accent);
+      root.style.setProperty('--accent-soft', `color-mix(in srgb, ${accent} 14%, transparent)`);
+    } else {
+      root.style.removeProperty('--accent');
+      root.style.removeProperty('--accent-soft');
+    }
+  }, [state.settings.accent]);
 
   const value = useMemo(() => ({ state, dispatch, sync }), [state, sync]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

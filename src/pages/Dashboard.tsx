@@ -30,7 +30,7 @@ export default function Dashboard({ ym, onNavigate }: { ym: string; onNavigate: 
   const expenseDelta = summary.expense - prev.expense;
   const topCategories = summary.expenseByCategory.slice(0, 8).map((b) => {
     const c = categoryById.get(b.id);
-    return { id: b.id, label: c?.name ?? 'ללא קטגוריה', emoji: c?.emoji, value: b.amount };
+    return { id: b.id, label: c?.name ?? 'ללא קטגוריה', emoji: c?.emoji, value: b.amount, color: c?.color };
   });
 
   const payerSegments = summary.expenseByPayer.map((b) => ({

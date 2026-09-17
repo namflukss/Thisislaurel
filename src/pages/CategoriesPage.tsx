@@ -55,7 +55,7 @@ export default function CategoriesPage({ ym }: { ym: string }) {
 
       <Card
         title="קטגוריות ותקציבים"
-        subtitle="כל קטגוריה שייכת לקבוצה, ואפשר להגדיר לה תקציב חודשי כדי לקבל התראה על חריגה"
+        subtitle="כל קטגוריה שייכת לקבוצה, ואפשר להגדיר לה תקציב חודשי, סמל וצבע משלה. שינוי הצבעים של בני הבית נמצא במסך ההגדרות."
         actions={
           <div style={{ display: 'flex', gap: 6 }}>
             <button
@@ -110,6 +110,11 @@ export default function CategoriesPage({ ym }: { ym: string }) {
                           <tr key={c.id}>
                             <td>
                               <span className="name-cell">
+                                <i
+                                  className="swatch"
+                                  style={{ background: c.color || 'var(--border-strong)' }}
+                                  title={c.color ? 'צבע מותאם' : 'צבע ברירת מחדל'}
+                                />
                                 <span className="emoji">{c.emoji}</span>
                                 {c.name}
                               </span>

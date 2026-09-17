@@ -17,6 +17,8 @@ export interface Person {
   name: string;
   /** false עבור "משותף" – ישות שאינה אדם פרטי, ולכן לא נכללת בהתחשבנות כצד */
   isIndividual: boolean;
+  /** צבע זהות מותאם אישית. ריק = צבע ברירת המחדל, שמתאים את עצמו למצב בהיר/כהה */
+  color?: string;
 }
 
 export type AccountKind = 'checking' | 'credit' | 'savings' | 'cash';
@@ -43,6 +45,8 @@ export interface Category {
   emoji: string;
   /** תקציב חודשי יעד (אופציונלי) */
   monthlyBudget?: number;
+  /** צבע מותאם אישית לקטגוריה בגרפים וברשימות */
+  color?: string;
   archived?: boolean;
 }
 
@@ -109,6 +113,8 @@ export interface Settings {
   /** אחוזים לפי personId, בשימוש כאשר splitMode === 'custom' */
   customShares: Record<string, number>;
   theme: 'auto' | 'light' | 'dark';
+  /** צבע ראשי לכפתורים ולהדגשות. ריק = ברירת המחדל */
+  accent?: string;
 }
 
 export interface AppState {

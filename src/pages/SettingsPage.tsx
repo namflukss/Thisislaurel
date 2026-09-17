@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { isValidState, useStore } from '../lib/store';
-import { Card, ConfirmButton, Field } from '../components/ui';
-import { personColor } from '../lib/colors';
+import { Card, ColorPicker, ConfirmButton, Field } from '../components/ui';
+import { defaultPersonColor, personColor } from '../lib/colors';
 import { todayISO } from '../lib/dates';
 import { saveFile } from '../lib/platform';
 import type { AppState, SplitMode } from '../types';
@@ -75,13 +75,48 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      <Card
+        title="צבעים"
+        subtitle="הצבע של כל אחד מלווה אותו בכל האפליקציה – בטבלאות, בגרפים ובסיכומים. ברירת המחדל מתאימה את עצמה למצב בהיר וכהה; צבע שבוחרים נשאר זהה בשניהם."
+      >
+        <div>
+          {state.persons.map((p) => (
+            <div className="color-row" key={p.id}>
+              <span className="who">
+                <i style={{ background: personColor(state.persons, p.id) }} />
+                {p.name}
+              </span>
+              <ColorPicker
+                value={p.color}
+                defaultSwatch={defaultPersonColor(state.persons, p.id)}
+                onChange={(color) => dispatch({ type: 'person/update', id: p.id, patch: { color } })}
+              />
+            </div>
+          ))}
+          <div className="color-row">
+            <span className="who">
+              <i style={{ background: 'var(--accent)' }} />
+              צבע ראשי
+            </span>
+            <ColorPicker
+              value={state.settings.accent}
+              defaultSwatch="#2a78d6"
+              onChange={(accent) => dispatch({ type: 'settings/update', patch: { accent } })}
+            />
+          </div>
+        </div>
+        <p className="small muted" style={{ marginTop: 10, marginBottom: 0 }}>
+          צבע לכל קטגוריה נקבע במסך הקטגוריות, בעת הוספה או עריכה.
+        </p>
+      </Card>
+
       <Card title="בני הבית" subtitle="השמות מופיעים בכל הדוחות ובסימון מקור הכסף">
         <div className="form-grid">
           {state.persons.map((p) => (
             <Field key={p.id} label={p.isIndividual ? 'בן/בת בית' : 'ישות משותפת'}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <i className="swatch" style={{ background: personColor(state.persons, p.id), width: 14, height: 14 }} />
-                <input value={p.name} onChange={(e) => dispatch({ type: 'person/rename', id: p.id, name: e.target.value })} />
+                <input value={p.name} onChange={(e) => dispatch({ type: 'person/update', id: p.id, patch: { name: e.target.value } })} />
               </div>
             </Field>
           ))}
