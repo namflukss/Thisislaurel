@@ -6,6 +6,7 @@ import { DivergingBar, RankBars, StackedShare, TrendColumns } from '../component
 import { buildLedger, categoryTrends, monthlyTotals, settle, summarizeMonth } from '../lib/compute';
 import { formatDate, lastMonths, monthLabel, shortMonthLabel } from '../lib/dates';
 import { personColor, STATUS_LABEL, TYPE_LABEL } from '../lib/colors';
+import { saveFile } from '../lib/platform';
 
 const RANGES = [
   { value: '3', label: '3 חודשים' },
@@ -18,13 +19,7 @@ function downloadCsv(filename: string, rows: (string | number)[][]) {
     .map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     .join('\n');
   // BOM כדי שאקסל יזהה עברית ב-UTF-8
-  const blob = new Blob(['﻿' + body], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  void saveFile(filename, '\uFEFF' + body, 'text/csv;charset=utf-8;');
 }
 
 export default function ReportsPage({ ym }: { ym: string }) {

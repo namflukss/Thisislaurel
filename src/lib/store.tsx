@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { Account, AppState, Category, Override, Recurring, Settings, Txn } from '../types';
 import { buildSeedState, emptyState } from '../data/seed';
 import { overrideKey } from './compute';
+import { getSharedDoc, type DocRef } from './platform';
 
 const STORAGE_KEY = 'household-budget:v1';
 
@@ -116,15 +117,75 @@ function loadState(): AppState {
   }
 }
 
+/** 'local' – נשמר רק בדפדפן הזה; 'shared' – מסונכרן בין כל מי שפתח את האפליקציה */
+export type SyncStatus = 'local' | 'shared';
+
 interface StoreValue {
   state: AppState;
   dispatch: React.Dispatch<Action>;
+  sync: SyncStatus;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, loadState);
+  const [sync, setSync] = useState<SyncStatus>('local');
+
+  // אחסון משותף (כשהאפליקציה רצה כ-Artifact): מסמך אחד שמחזיק את כל המצב,
+  // כך ששני בני הבית רואים את אותם נתונים בכל מכשיר.
+  const docRef = useRef<DocRef | null>(null);
+  const lastSyncedRef = useRef<string | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
+
+    const apply = (raw: unknown) => {
+      if (typeof raw !== 'string' || raw === lastSyncedRef.current) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!isValidState(parsed)) return;
+        lastSyncedRef.current = raw;
+        dispatch({ type: 'state/replace', state: parsed as AppState });
+      } catch {
+        // מסמך פגום – ממשיכים עם הנתונים המקומיים
+      }
+    };
+
+    void (async () => {
+      const doc = await getSharedDoc();
+      if (!doc || cancelled) return;
+      try {
+        const snap = await doc.get();
+        if (cancelled) return;
+        if (snap.exists) {
+          apply(snap.data()?.state);
+        } else {
+          // פתיחה ראשונה: מעלים את מה שיש במכשיר הזה כנקודת הפתיחה המשותפת
+          const payload = JSON.stringify(stateRef.current);
+          lastSyncedRef.current = payload;
+          await doc.set({ state: payload, updatedAt: new Date().toISOString() });
+        }
+        if (cancelled) return;
+        docRef.current = doc;
+        setSync('shared');
+        unsubscribe = doc.onSnapshot(
+          (next) => apply(next.data()?.state),
+          () => setSync('local'),
+        );
+      } catch {
+        // אין הרשאת כתיבה או שהאחסון אינו זמין – נשארים על אחסון מקומי
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -134,6 +195,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state]);
 
+  // כתיבה לאחסון המשותף אחרי שקט קצר, כדי לאחד רצף עריכות לכתיבה אחת
+  useEffect(() => {
+    const doc = docRef.current;
+    if (!doc) return;
+    const payload = JSON.stringify(state);
+    if (payload === lastSyncedRef.current) return;
+    const timer = setTimeout(() => {
+      lastSyncedRef.current = payload;
+      void doc.set({ state: payload, updatedAt: new Date().toISOString() }).catch(() => setSync('local'));
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [state, sync]);
+
   useEffect(() => {
     const theme = state.settings.theme;
     const root = document.documentElement;
@@ -141,7 +215,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     else root.setAttribute('data-theme', theme);
   }, [state.settings.theme]);
 
-  const value = useMemo(() => ({ state, dispatch }), [state]);
+  const value = useMemo(() => ({ state, dispatch, sync }), [state, sync]);
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 

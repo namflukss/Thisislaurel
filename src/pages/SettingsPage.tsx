@@ -3,6 +3,7 @@ import { isValidState, useStore } from '../lib/store';
 import { Card, ConfirmButton, Field } from '../components/ui';
 import { personColor } from '../lib/colors';
 import { todayISO } from '../lib/dates';
+import { saveFile } from '../lib/platform';
 import type { AppState, SplitMode } from '../types';
 
 const SPLIT_LABEL: Record<SplitMode, string> = {
@@ -12,21 +13,23 @@ const SPLIT_LABEL: Record<SplitMode, string> = {
 };
 
 export default function SettingsPage() {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, sync } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const individuals = state.persons.filter((p) => p.isIndividual);
 
-  const exportJson = () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `גיבוי-תקציב-הבית-${todayISO()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setMessage('הגיבוי ירד למחשב. אפשר לשמור אותו או להעביר למכשיר אחר.');
+  const exportJson = async () => {
+    const result = await saveFile(
+      `household-budget-${todayISO()}.json`,
+      JSON.stringify(state, null, 2),
+      'application/json',
+    );
+    setMessage(
+      result === 'declined'
+        ? 'ההורדה בוטלה.'
+        : 'הגיבוי נשמר. אפשר לשמור אותו או להעביר למכשיר אחר.',
+    );
   };
 
   const importJson = async (file: File) => {
@@ -128,10 +131,14 @@ export default function SettingsPage() {
 
       <Card
         title="גיבוי ושחזור"
-        subtitle="הנתונים נשמרים בדפדפן של המכשיר הזה בלבד. כדי לשתף אותם עם בן/בת הזוג או לעבור מכשיר – ייצאו קובץ וטענו אותו בצד השני."
+        subtitle={
+          sync === 'shared'
+            ? 'הנתונים נשמרים באחסון המשותף של האפליקציה – כל מי שפותח את הקישור רואה את אותם נתונים, מכל מכשיר. הגיבוי הוא עותק נוסף לשמירה אצלכם.'
+            : 'הנתונים נשמרים בדפדפן של המכשיר הזה בלבד. כדי לשתף אותם עם בן/בת הזוג או לעבור מכשיר – ייצאו קובץ וטענו אותו בצד השני.'
+        }
       >
         <div className="toolbar">
-          <button type="button" className="btn primary" onClick={exportJson}>
+          <button type="button" className="btn primary" onClick={() => void exportJson()}>
             ייצוא גיבוי (JSON)
           </button>
           <button type="button" className="btn" onClick={() => fileRef.current?.click()}>
@@ -176,6 +183,7 @@ export default function SettingsPage() {
           </p>
         )}
         <p className="small muted" style={{ marginTop: 12 }}>
+          {sync === 'shared' ? 'מצב שמירה: אחסון משותף (מסונכרן).' : 'מצב שמירה: מקומי, בדפדפן הזה.'}{' '}
           כרגע נשמרים {state.recurring.length} חיובים קבועים, {state.txns.length} תנועות חד-פעמיות,{' '}
           {state.categories.length} קטגוריות ו-{state.accounts.length} חשבונות.
         </p>

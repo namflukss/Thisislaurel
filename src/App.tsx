@@ -80,7 +80,7 @@ const TABS: Tab[] = [
 ];
 
 function Shell() {
-  const { state } = useStore();
+  const { state, sync } = useStore();
   const [tabId, setTabId] = useState(() => {
     const fromHash = window.location.hash.replace('#', '');
     return TABS.some((t) => t.id === fromHash) ? fromHash : 'dashboard';
@@ -115,6 +115,11 @@ function Shell() {
               <small>ניהול כלכלת הבית</small>
             </span>
           </div>
+          {sync === 'shared' && (
+            <span className="pill" title="הנתונים מסונכרנים בין כל מי שפותח את האפליקציה">
+              <i className="dot" style={{ background: 'var(--good)' }} /> מסונכרן
+            </span>
+          )}
           {tab.monthly && <MonthNav ym={ym} onChange={setYm} />}
         </div>
         <nav className="nav" aria-label="ניווט ראשי">
