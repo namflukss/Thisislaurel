@@ -18,10 +18,18 @@
 
 ```bash
 npm install
-npm run dev        # סביבת פיתוח (http://localhost:5173)
+npm run dev        # סביבת פיתוח (http://localhost:5290)
 npm run build      # בנייה לפרודקשן לתיקיית dist
-npm run preview    # תצוגה מקדימה של הבנייה
+npm run preview    # תצוגה מקדימה של הבנייה (http://localhost:4290)
 npm run build:artifact  # בנייה + הכנת עמוד יחיד לפרסום כ-Artifact
+```
+
+הפורטים נקבעים ב-`vite.config.ts` (5290 לפיתוח, 4290 לתצוגה מקדימה) – הרחק
+מברירות המחדל של Vite שנוטות להיות תפוסות. אם גם הפורט הזה תפוס, Vite עובר לבד
+לפורט הפנוי הבא ומדפיס את הכתובת. לפורט חד-פעמי אחר:
+
+```bash
+npm run dev -- --port 5400
 ```
 
 הבנייה יוצרת קבצים סטטיים בלבד (`base: './'`), כך שאפשר להעלות את תוכן `dist/` לכל אחסון סטטי – GitHub Pages, Netlify, או אפילו תיקייה משותפת.

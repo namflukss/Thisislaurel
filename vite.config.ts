@@ -7,4 +7,8 @@ export default defineConfig({
   plugins: [react()],
   base: './',
   build: { outDir: 'dist', sourcemap: false },
+  // ports away from Vite's defaults (5173/4173), which are often already taken.
+  // strictPort stays off, so a busy port just rolls over to the next free one.
+  server: { port: 5290, strictPort: false, open: false },
+  preview: { port: 4290, strictPort: false },
 });
