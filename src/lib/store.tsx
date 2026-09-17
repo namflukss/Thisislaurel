@@ -1,0 +1,158 @@
+import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
+import type { Account, AppState, Category, Override, Recurring, Settings, Txn } from '../types';
+import { buildSeedState, emptyState } from '../data/seed';
+import { overrideKey } from './compute';
+
+const STORAGE_KEY = 'household-budget:v1';
+
+export type Action =
+  | { type: 'person/rename'; id: string; name: string }
+  | { type: 'account/save'; account: Account }
+  | { type: 'account/delete'; id: string }
+  | { type: 'category/save'; category: Category }
+  | { type: 'category/delete'; id: string }
+  | { type: 'recurring/save'; recurring: Recurring }
+  | { type: 'recurring/delete'; id: string }
+  | { type: 'recurring/toggle'; id: string }
+  | { type: 'txn/save'; txn: Txn }
+  | { type: 'txn/delete'; id: string }
+  | { type: 'override/set'; recurringId: string; ym: string; patch: Override | null }
+  | { type: 'settings/update'; patch: Partial<Settings> }
+  | { type: 'state/replace'; state: AppState }
+  | { type: 'state/reset'; mode: 'seed' | 'empty' };
+
+function upsert<T extends { id: string }>(list: T[], item: T): T[] {
+  const idx = list.findIndex((x) => x.id === item.id);
+  if (idx === -1) return [...list, item];
+  const copy = list.slice();
+  copy[idx] = item;
+  return copy;
+}
+
+export function reducer(state: AppState, action: Action): AppState {
+  switch (action.type) {
+    case 'person/rename':
+      return {
+        ...state,
+        persons: state.persons.map((p) => (p.id === action.id ? { ...p, name: action.name } : p)),
+      };
+    case 'account/save':
+      return { ...state, accounts: upsert(state.accounts, action.account) };
+    case 'account/delete':
+      return {
+        ...state,
+        accounts: state.accounts.filter((a) => a.id !== action.id),
+        recurring: state.recurring.filter((r) => r.accountId !== action.id && r.toAccountId !== action.id),
+        txns: state.txns.filter((t) => t.accountId !== action.id && t.toAccountId !== action.id),
+      };
+    case 'category/save':
+      return { ...state, categories: upsert(state.categories, action.category) };
+    case 'category/delete':
+      return {
+        ...state,
+        categories: state.categories.filter((c) => c.id !== action.id),
+        recurring: state.recurring.map((r) => (r.categoryId === action.id ? { ...r, categoryId: undefined } : r)),
+        txns: state.txns.map((t) => (t.categoryId === action.id ? { ...t, categoryId: undefined } : t)),
+      };
+    case 'recurring/save':
+      return { ...state, recurring: upsert(state.recurring, action.recurring) };
+    case 'recurring/delete': {
+      const overrides = { ...state.overrides };
+      for (const key of Object.keys(overrides)) {
+        if (key.startsWith(`${action.id}|`)) delete overrides[key];
+      }
+      return { ...state, recurring: state.recurring.filter((r) => r.id !== action.id), overrides };
+    }
+    case 'recurring/toggle':
+      return {
+        ...state,
+        recurring: state.recurring.map((r) => (r.id === action.id ? { ...r, active: !r.active } : r)),
+      };
+    case 'txn/save':
+      return { ...state, txns: upsert(state.txns, action.txn) };
+    case 'txn/delete':
+      return { ...state, txns: state.txns.filter((t) => t.id !== action.id) };
+    case 'override/set': {
+      const key = overrideKey(action.recurringId, action.ym);
+      const overrides = { ...state.overrides };
+      if (action.patch === null) delete overrides[key];
+      else overrides[key] = { ...overrides[key], ...action.patch };
+      return { ...state, overrides };
+    }
+    case 'settings/update':
+      return { ...state, settings: { ...state.settings, ...action.patch } };
+    case 'state/replace':
+      return action.state;
+    case 'state/reset':
+      return action.mode === 'seed' ? buildSeedState() : emptyState();
+    default:
+      return state;
+  }
+}
+
+/** בדיקת שפיות בסיסית לקובץ מיובא / לנתונים שנשמרו */
+export function isValidState(value: unknown): value is AppState {
+  if (!value || typeof value !== 'object') return false;
+  const s = value as Partial<AppState>;
+  return (
+    Array.isArray(s.persons) &&
+    Array.isArray(s.accounts) &&
+    Array.isArray(s.categories) &&
+    Array.isArray(s.recurring) &&
+    Array.isArray(s.txns) &&
+    !!s.settings
+  );
+}
+
+function loadState(): AppState {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return buildSeedState();
+    const parsed = JSON.parse(raw);
+    if (!isValidState(parsed)) return buildSeedState();
+    return { ...buildSeedState(), ...parsed, overrides: parsed.overrides ?? {} };
+  } catch {
+    return buildSeedState();
+  }
+}
+
+interface StoreValue {
+  state: AppState;
+  dispatch: React.Dispatch<Action>;
+}
+
+const StoreContext = createContext<StoreValue | null>(null);
+
+export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const [state, dispatch] = useReducer(reducer, undefined, loadState);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      // מצב פרטי בדפדפן או אחסון מלא – האפליקציה ממשיכה לעבוד בזיכרון בלבד
+    }
+  }, [state]);
+
+  useEffect(() => {
+    const theme = state.settings.theme;
+    const root = document.documentElement;
+    if (theme === 'auto') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', theme);
+  }, [state.settings.theme]);
+
+  const value = useMemo(() => ({ state, dispatch }), [state]);
+  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+}
+
+export function useStore(): StoreValue {
+  const ctx = useContext(StoreContext);
+  if (!ctx) throw new Error('useStore must be used inside StoreProvider');
+  return ctx;
+}
+
+export function newId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+export { STORAGE_KEY };
