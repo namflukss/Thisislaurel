@@ -14,47 +14,47 @@ export const ACC_SAVINGS = 'a-savings';
 
 const CATEGORIES: Category[] = [
   // דיור ותחזוקה
-  { id: 'c-rent', name: 'שכר דירה', group: 'דיור', type: 'expense', emoji: '🏠', monthlyBudget: 6500 },
-  { id: 'c-vaad', name: 'ועד בית', group: 'דיור', type: 'expense', emoji: '🏢', monthlyBudget: 250 },
-  { id: 'c-arnona', name: 'ארנונה', group: 'דיור', type: 'expense', emoji: '🧾', monthlyBudget: 420 },
-  { id: 'c-electric', name: 'חשמל', group: 'חשבונות שוטפים', type: 'expense', emoji: '💡', monthlyBudget: 400 },
-  { id: 'c-water', name: 'מים', group: 'חשבונות שוטפים', type: 'expense', emoji: '🚿', monthlyBudget: 180 },
-  { id: 'c-gas', name: 'גז', group: 'חשבונות שוטפים', type: 'expense', emoji: '🔥', monthlyBudget: 90 },
-  { id: 'c-internet', name: 'אינטרנט וטלוויזיה', group: 'חשבונות שוטפים', type: 'expense', emoji: '📶', monthlyBudget: 160 },
-  { id: 'c-phone', name: 'סלולר', group: 'חשבונות שוטפים', type: 'expense', emoji: '📱', monthlyBudget: 100 },
-  { id: 'c-home', name: 'תחזוקת הבית', group: 'דיור', type: 'expense', emoji: '🔧', monthlyBudget: 250 },
+  { id: 'c-rent', name: 'שכר דירה', group: 'דיור', type: 'expense', emoji: '🏠' },
+  { id: 'c-vaad', name: 'ועד בית', group: 'דיור', type: 'expense', emoji: '🏢' },
+  { id: 'c-arnona', name: 'ארנונה', group: 'דיור', type: 'expense', emoji: '🧾' },
+  { id: 'c-electric', name: 'חשמל', group: 'חשבונות שוטפים', type: 'expense', emoji: '💡' },
+  { id: 'c-water', name: 'מים', group: 'חשבונות שוטפים', type: 'expense', emoji: '🚿' },
+  { id: 'c-gas', name: 'גז', group: 'חשבונות שוטפים', type: 'expense', emoji: '🔥' },
+  { id: 'c-internet', name: 'אינטרנט וטלוויזיה', group: 'חשבונות שוטפים', type: 'expense', emoji: '📶' },
+  { id: 'c-phone', name: 'סלולר', group: 'חשבונות שוטפים', type: 'expense', emoji: '📱' },
+  { id: 'c-home', name: 'תחזוקת הבית', group: 'דיור', type: 'expense', emoji: '🔧' },
 
   // ילדים וחינוך
-  { id: 'c-gan', name: 'גן', group: 'ילדים וחינוך', type: 'expense', emoji: '🎒', monthlyBudget: 2200 },
-  { id: 'c-tsaharon', name: 'צהרון', group: 'ילדים וחינוך', type: 'expense', emoji: '🧸', monthlyBudget: 850 },
-  { id: 'c-hugim', name: 'חוגים', group: 'ילדים וחינוך', type: 'expense', emoji: '⚽', monthlyBudget: 300 },
-  { id: 'c-kids', name: 'ציוד וביגוד לילדים', group: 'ילדים וחינוך', type: 'expense', emoji: '👕', monthlyBudget: 400 },
-  { id: 'c-babysitter', name: 'בייביסיטר', group: 'ילדים וחינוך', type: 'expense', emoji: '👶', monthlyBudget: 300 },
+  { id: 'c-gan', name: 'גן', group: 'ילדים וחינוך', type: 'expense', emoji: '🎒' },
+  { id: 'c-tsaharon', name: 'צהרון', group: 'ילדים וחינוך', type: 'expense', emoji: '🧸' },
+  { id: 'c-hugim', name: 'חוגים', group: 'ילדים וחינוך', type: 'expense', emoji: '⚽' },
+  { id: 'c-kids', name: 'ציוד וביגוד לילדים', group: 'ילדים וחינוך', type: 'expense', emoji: '👕' },
+  { id: 'c-babysitter', name: 'בייביסיטר', group: 'ילדים וחינוך', type: 'expense', emoji: '👶' },
 
   // מזון
-  { id: 'c-super', name: 'סופר', group: 'מזון', type: 'expense', emoji: '🛒', monthlyBudget: 3200 },
-  { id: 'c-restaurants', name: 'מסעדות וקפה', group: 'מזון', type: 'expense', emoji: '🍽️', monthlyBudget: 900 },
+  { id: 'c-super', name: 'סופר', group: 'מזון', type: 'expense', emoji: '🛒' },
+  { id: 'c-restaurants', name: 'מסעדות וקפה', group: 'מזון', type: 'expense', emoji: '🍽️' },
 
   // תחבורה
-  { id: 'c-fuel', name: 'דלק', group: 'תחבורה', type: 'expense', emoji: '⛽', monthlyBudget: 900 },
-  { id: 'c-car', name: 'רכב – טיפולים וטסט', group: 'תחבורה', type: 'expense', emoji: '🚗', monthlyBudget: 250 },
-  { id: 'c-transit', name: 'תחבורה ציבורית', group: 'תחבורה', type: 'expense', emoji: '🚌', monthlyBudget: 120 },
+  { id: 'c-fuel', name: 'דלק', group: 'תחבורה', type: 'expense', emoji: '⛽' },
+  { id: 'c-car', name: 'רכב – טיפולים וטסט', group: 'תחבורה', type: 'expense', emoji: '🚗' },
+  { id: 'c-transit', name: 'תחבורה ציבורית', group: 'תחבורה', type: 'expense', emoji: '🚌' },
 
   // ביטוחים ובריאות
-  { id: 'c-ins-health', name: 'ביטוח בריאות', group: 'ביטוח ובריאות', type: 'expense', emoji: '🩺', monthlyBudget: 320 },
-  { id: 'c-ins-home', name: 'ביטוח דירה', group: 'ביטוח ובריאות', type: 'expense', emoji: '🛡️', monthlyBudget: 65 },
-  { id: 'c-ins-car', name: 'ביטוח רכב', group: 'ביטוח ובריאות', type: 'expense', emoji: '🚙', monthlyBudget: 380 },
-  { id: 'c-health', name: 'בריאות ותרופות', group: 'ביטוח ובריאות', type: 'expense', emoji: '💊', monthlyBudget: 200 },
+  { id: 'c-ins-health', name: 'ביטוח בריאות', group: 'ביטוח ובריאות', type: 'expense', emoji: '🩺' },
+  { id: 'c-ins-home', name: 'ביטוח דירה', group: 'ביטוח ובריאות', type: 'expense', emoji: '🛡️' },
+  { id: 'c-ins-car', name: 'ביטוח רכב', group: 'ביטוח ובריאות', type: 'expense', emoji: '🚙' },
+  { id: 'c-health', name: 'בריאות ותרופות', group: 'ביטוח ובריאות', type: 'expense', emoji: '💊' },
 
   // מנויים ופנאי
-  { id: 'c-subs', name: 'מנויים דיגיטליים', group: 'מנויים ופנאי', type: 'expense', emoji: '🎬', monthlyBudget: 160 },
-  { id: 'c-gym', name: 'חדר כושר וספורט', group: 'מנויים ופנאי', type: 'expense', emoji: '🏋️', monthlyBudget: 190 },
-  { id: 'c-fun', name: 'בילויים ופנאי', group: 'מנויים ופנאי', type: 'expense', emoji: '🎭', monthlyBudget: 600 },
-  { id: 'c-gifts', name: 'מתנות ואירועים', group: 'מנויים ופנאי', type: 'expense', emoji: '🎁', monthlyBudget: 300 },
-  { id: 'c-personal', name: 'הוצאות אישיות', group: 'מנויים ופנאי', type: 'expense', emoji: '🧴', monthlyBudget: 3200 },
+  { id: 'c-subs', name: 'מנויים דיגיטליים', group: 'מנויים ופנאי', type: 'expense', emoji: '🎬' },
+  { id: 'c-gym', name: 'חדר כושר וספורט', group: 'מנויים ופנאי', type: 'expense', emoji: '🏋️' },
+  { id: 'c-fun', name: 'בילויים ופנאי', group: 'מנויים ופנאי', type: 'expense', emoji: '🎭' },
+  { id: 'c-gifts', name: 'מתנות ואירועים', group: 'מנויים ופנאי', type: 'expense', emoji: '🎁' },
+  { id: 'c-personal', name: 'הוצאות אישיות', group: 'מנויים ופנאי', type: 'expense', emoji: '🧴' },
 
   // חיסכון
-  { id: 'c-savings', name: 'חיסכון והשקעות', group: 'חיסכון', type: 'expense', emoji: '🏦', monthlyBudget: 1500 },
+  { id: 'c-savings', name: 'חיסכון והשקעות', group: 'חיסכון', type: 'expense', emoji: '🏦' },
   { id: 'c-other-exp', name: 'שונות', group: 'שונות', type: 'expense', emoji: '📦' },
 
   // הכנסות
@@ -220,6 +220,7 @@ export function buildSeedState(): AppState {
     recurring: buildRecurring(start),
     txns: buildTxns(),
     overrides: {},
+    settlements: [],
     settings: {
       householdName: 'משק הבית שלנו',
       currency: 'ILS',
@@ -238,6 +239,7 @@ export function emptyState(): AppState {
     recurring: [],
     txns: [],
     overrides: {},
+    settlements: [],
     accounts: seed.accounts.map((a) => ({ ...a, openingBalance: 0, openingDate: todayISO() })),
   };
 }

@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react';
-import { useStore } from '../lib/store';
+import { newId, useStore } from '../lib/store';
 import { useMoneyFormat } from '../lib/format';
-import { Card, Stat, Toggle } from '../components/ui';
+import { Card, Field, Modal, Stat, Toggle } from '../components/ui';
 import { DivergingBar, RankBars, StackedShare, TrendColumns } from '../components/charts';
 import { buildLedger, categoryTrends, monthlyTotals, settle, summarizeMonth } from '../lib/compute';
-import { formatDate, lastMonths, monthLabel, shortMonthLabel } from '../lib/dates';
-import { personColor, STATUS_LABEL, TYPE_LABEL } from '../lib/colors';
+import { formatDate, lastMonths, monthLabel, shortMonthLabel, todayISO } from '../lib/dates';
+import { accountColor, personColor, STATUS_LABEL, TYPE_LABEL } from '../lib/colors';
 import { saveFile } from '../lib/platform';
+import { plural } from '../lib/text';
+import type { SettlementRecord } from '../types';
 
 const RANGES = [
+  { value: '1', label: 'החודש' },
   { value: '3', label: '3 חודשים' },
   { value: '6', label: '6 חודשים' },
   { value: '12', label: '12 חודשים' },
@@ -22,15 +25,30 @@ function downloadCsv(filename: string, rows: (string | number)[][]) {
   void saveFile(filename, '\uFEFF' + body, 'text/csv;charset=utf-8;');
 }
 
+/** תיאור התקופה שעליה מדובר – חודש בודד או טווח */
+function periodLabel(from: string, to: string): string {
+  return from === to ? monthLabel(from) : `${monthLabel(from)} – ${monthLabel(to)}`;
+}
+
 export default function ReportsPage({ ym }: { ym: string }) {
-  const { state } = useStore();
+  const { state, dispatch } = useStore();
   const { money, signed } = useMoneyFormat();
   const [range, setRange] = useState('12');
+  const [settling, setSettling] = useState(false);
 
   const months = useMemo(() => lastMonths(ym, Number(range)), [ym, range]);
   const totals = useMemo(() => monthlyTotals(state, months), [state, months]);
   const trends = useMemo(() => categoryTrends(state, months), [state, months]);
   const settlement = useMemo(() => settle(state, months), [state, months]);
+
+  const fromMonth = months[0];
+  const toMonth = months[months.length - 1];
+  const settledRecord = (state.settlements ?? []).find(
+    (r) => r.fromMonth === fromMonth && r.toMonth === toMonth,
+  );
+  const pastSettlements = [...(state.settlements ?? [])]
+    .filter((r) => r.id !== settledRecord?.id)
+    .sort((a, b) => b.settledOn.localeCompare(a.settledOn));
 
   const categoryById = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
   const accountById = useMemo(() => new Map(state.accounts.map((a) => [a.id, a])), [state.accounts]);
@@ -139,19 +157,29 @@ export default function ReportsPage({ ym }: { ym: string }) {
       </div>
 
       <div className="grid grid-4">
-        <Stat label="סך הכנסות" value={money(income)} color="var(--income)" foot={`${money(income / months.length)} בממוצע לחודש`} />
-        <Stat label="סך הוצאות" value={money(expense)} color="var(--expense)" foot={`${money(expense / months.length)} בממוצע לחודש`} />
+        <Stat
+          label="סך הכנסות"
+          value={money(income)}
+          color="var(--income)"
+          foot={months.length > 1 ? `${money(income / months.length)} בממוצע לחודש` : undefined}
+        />
+        <Stat
+          label="סך הוצאות"
+          value={money(expense)}
+          color="var(--expense)"
+          foot={months.length > 1 ? `${money(expense / months.length)} בממוצע לחודש` : undefined}
+        />
         <Stat label="מאזן מצטבר" value={signed(net)} foot={`שיעור חיסכון ${savingsRate.toFixed(0)}%`} />
         <Stat label="הופקד לחיסכון" value={money(savings)} foot="העברות לחשבונות חיסכון" />
       </div>
 
-      <Card title="מגמת הכנסות והוצאות" subtitle={`${months.length} חודשים אחרונים`}>
+      <Card title="מגמת הכנסות והוצאות" subtitle={months.length === 1 ? monthLabel(months[0]) : `${months.length} חודשים אחרונים`}>
         <TrendColumns data={totals.map((t) => ({ ym: t.ym, income: t.income, expense: t.expense }))} />
       </Card>
 
       <Card
         title="התחשבנות בין בני הבית"
-        subtitle={`${settlement.modeLabel} · מחושב על ${months.length} חודשים. ההוצאות מהחשבון המשותף מיוחסות לפי חלקו של כל אחד במימון החשבון.`}
+        subtitle={`${settlement.modeLabel} · מחושב על ${plural(months.length, 'חודש', 'חודשים')}. ההוצאות מהחשבון המשותף מיוחסות לפי חלקו של כל אחד במימון החשבון.`}
       >
         <div className="table-wrap">
           <table className="data">
@@ -212,22 +240,94 @@ export default function ReportsPage({ ym }: { ym: string }) {
           </table>
         </div>
 
-        {settlement.transfer ? (
+        {settledRecord ? (
+          <div className="tip settled" style={{ marginTop: 12 }}>
+            <span className="row-between" style={{ gap: 12, flexWrap: 'wrap' }}>
+              <span>
+                <span className="badge-status paid" style={{ marginInlineEnd: 8 }}>
+                  הוסדר
+                </span>
+                <strong>{personById.get(settledRecord.fromPersonId)?.name}</strong> העביר/ה{' '}
+                <strong>{money(settledRecord.amount)}</strong> ל
+                <strong>{personById.get(settledRecord.toPersonId)?.name}</strong> בתאריך{' '}
+                {formatDate(settledRecord.settledOn)}
+                {settledRecord.txnId && <span className="muted small"> · ההעברה נרשמה ביומן התנועות</span>}
+              </span>
+              <button
+                type="button"
+                className="btn small ghost"
+                onClick={() => dispatch({ type: 'settlement/delete', id: settledRecord.id })}
+              >
+                ביטול הסימון
+              </button>
+            </span>
+          </div>
+        ) : settlement.transfer ? (
           <div className="tip" style={{ marginTop: 12 }}>
-            <strong>{personById.get(settlement.transfer.fromId)?.name}</strong> צריך/ה להעביר{' '}
-            <strong>{money(settlement.transfer.amount)}</strong> ל
-            <strong>{personById.get(settlement.transfer.toId)?.name}</strong> כדי לאזן את התקופה.
-            שיטת החלוקה נקבעת במסך ההגדרות.
+            <span className="row-between" style={{ gap: 12, flexWrap: 'wrap' }}>
+              <span>
+                <span className="badge-status pending" style={{ marginInlineEnd: 8 }}>
+                  טרם הוסדר
+                </span>
+                <strong>{personById.get(settlement.transfer.fromId)?.name}</strong> משלים/ה{' '}
+                <strong>{money(settlement.transfer.amount)}</strong> ל
+                <strong>{personById.get(settlement.transfer.toId)?.name}</strong> כדי לסגור את התקופה
+                באיזון. שיטת החלוקה נקבעת במסך ההגדרות.
+              </span>
+              <button type="button" className="btn small primary" onClick={() => setSettling(true)}>
+                סימון כהוסדר
+              </button>
+            </span>
           </div>
         ) : (
           <div className="tip" style={{ marginTop: 12 }}>
-            החלוקה מאוזנת – אין צורך בהעברת כספים בין בני הבית בתקופה זו.
+            החלוקה מאוזנת – אין צורך בהעברה בין בני הבית בתקופה זו.
+          </div>
+        )}
+
+        {pastSettlements.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <h3 style={{ fontSize: 14, marginBottom: 6 }}>איזונים קודמים</h3>
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>תקופה</th>
+                    <th>מי השלים</th>
+                    <th className="num">סכום</th>
+                    <th>תאריך</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pastSettlements.map((r) => (
+                    <tr key={r.id}>
+                      <td>{periodLabel(r.fromMonth, r.toMonth)}</td>
+                      <td className="small">
+                        {personById.get(r.fromPersonId)?.name} ← {personById.get(r.toPersonId)?.name}
+                      </td>
+                      <td className="num">{money(r.amount)}</td>
+                      <td className="small muted nums">{formatDate(r.settledOn)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn small ghost"
+                          onClick={() => dispatch({ type: 'settlement/delete', id: r.id })}
+                        >
+                          ביטול
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </Card>
 
       <div className="grid grid-2">
-        <Card title="לאן הלך הכסף" subtitle={`הוצאות לפי קבוצה, ${months.length} חודשים`}>
+        <Card title="לאן הלך הכסף" subtitle={`הוצאות לפי קבוצה, ${plural(months.length, 'חודש', 'חודשים')}`}>
           <RankBars rows={groupTotals.map((g) => ({ id: g.id, label: g.id, value: g.amount }))} />
         </Card>
 
@@ -313,7 +413,7 @@ export default function ReportsPage({ ym }: { ym: string }) {
         </div>
       </Card>
 
-      <Card title="קטגוריות לאורך זמן" subtitle="סך ההוצאה בכל קטגוריה, וממוצע חודשי – בסיס לעדכון תקציבים">
+      <Card title="קטגוריות לאורך זמן" subtitle="סך ההוצאה בכל קטגוריה וממוצע חודשי – כדי לראות לאן הכסף הולך לאורך זמן">
         <div className="table-wrap">
           <table className="data">
             <thead>
@@ -357,7 +457,18 @@ export default function ReportsPage({ ym }: { ym: string }) {
         </div>
       </Card>
 
-      <Card title="תנועה לפי חשבון" subtitle={`סך ההכנסות, ההוצאות וההעברות בכל חשבון, ${months.length} חודשים`}>
+      {settling && settlement.transfer && (
+        <SettleModal
+          fromMonth={fromMonth}
+          toMonth={toMonth}
+          fromPersonId={settlement.transfer.fromId}
+          toPersonId={settlement.transfer.toId}
+          amount={settlement.transfer.amount}
+          onClose={() => setSettling(false)}
+        />
+      )}
+
+      <Card title="תנועה לפי חשבון" subtitle={`סך ההכנסות, ההוצאות וההעברות בכל חשבון, ${plural(months.length, 'חודש', 'חודשים')}`}>
         <div className="table-wrap">
           <table className="data">
             <thead>
@@ -376,7 +487,7 @@ export default function ReportsPage({ ym }: { ym: string }) {
                 <tr key={r.account.id}>
                   <td>
                     <span className="name-cell">
-                      <i className="swatch" style={{ background: personColor(state.persons, r.account.ownerId) }} />
+                      <i className="swatch" style={{ background: accountColor(state.accounts, state.persons, r.account.id) }} />
                       {r.account.name}
                     </span>
                   </td>
@@ -393,5 +504,130 @@ export default function ReportsPage({ ym }: { ym: string }) {
         </div>
       </Card>
     </>
+  );
+}
+
+/**
+ * סימון שהאיזון בוצע: רישום התאריך והסכום, ואפשרות לרשום גם את ההעברה
+ * עצמה בין החשבונות הפרטיים, כדי שהיתרות יישארו נכונות.
+ */
+function SettleModal({
+  fromMonth,
+  toMonth,
+  fromPersonId,
+  toPersonId,
+  amount: suggested,
+  onClose,
+}: {
+  fromMonth: string;
+  toMonth: string;
+  fromPersonId: string;
+  toPersonId: string;
+  amount: number;
+  onClose: () => void;
+}) {
+  const { state, dispatch } = useStore();
+  const { money } = useMoneyFormat();
+  const personById = new Map(state.persons.map((p) => [p.id, p]));
+  const accountsOf = (personId: string) => state.accounts.filter((a) => a.ownerId === personId);
+
+  const [amount, setAmount] = useState(String(Math.round(suggested)));
+  const [date, setDate] = useState(todayISO());
+  const [recordTransfer, setRecordTransfer] = useState(true);
+  const [fromAccountId, setFromAccountId] = useState(accountsOf(fromPersonId)[0]?.id ?? '');
+  const [toAccountId, setToAccountId] = useState(accountsOf(toPersonId)[0]?.id ?? '');
+
+  const value = Math.abs(Number(amount.replace(/[^\d.-]/g, ''))) || 0;
+  const canRecord = recordTransfer && fromAccountId && toAccountId && fromAccountId !== toAccountId;
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const record: SettlementRecord = {
+      id: newId('s'),
+      fromMonth,
+      toMonth,
+      fromPersonId,
+      toPersonId,
+      amount: value,
+      settledOn: date,
+    };
+    if (canRecord) {
+      const txnId = newId('t');
+      dispatch({
+        type: 'txn/save',
+        txn: {
+          id: txnId,
+          date,
+          type: 'transfer',
+          name: `איזון ${periodLabel(fromMonth, toMonth)}`,
+          amount: value,
+          accountId: fromAccountId,
+          toAccountId,
+          note: `השלמת איזון בין ${personById.get(fromPersonId)?.name} ל${personById.get(toPersonId)?.name}`,
+        },
+      });
+      record.txnId = txnId;
+    }
+    dispatch({ type: 'settlement/save', record });
+    onClose();
+  };
+
+  return (
+    <Modal title={`סימון איזון – ${periodLabel(fromMonth, toMonth)}`} onClose={onClose}>
+      <form onSubmit={submit}>
+        <p className="small muted" style={{ marginTop: 0 }}>
+          לפי החישוב, {personById.get(fromPersonId)?.name} משלים/ה {money(suggested)} ל
+          {personById.get(toPersonId)?.name}. אפשר לשנות את הסכום אם הועבר סכום אחר.
+        </p>
+        <div className="form-grid">
+          <Field label="סכום שהועבר (₪)">
+            <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </Field>
+          <Field label="תאריך ההעברה">
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <div className="full">
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                checked={recordTransfer}
+                onChange={(e) => setRecordTransfer(e.target.checked)}
+              />
+              לרשום גם את ההעברה בפועל בין החשבונות
+            </label>
+          </div>
+          {recordTransfer && (
+            <>
+              <Field label="מהחשבון">
+                <select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)}>
+                  {state.accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="לחשבון">
+                <select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
+                  {state.accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </>
+          )}
+        </div>
+        <div className="modal-actions">
+          <button type="submit" className="btn primary" disabled={!value}>
+            סימון כהוסדר
+          </button>
+          <button type="button" className="btn ghost" onClick={onClose}>
+            ביטול
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

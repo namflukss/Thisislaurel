@@ -1,5 +1,15 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import type { Account, AppState, Category, Override, Person, Recurring, Settings, Txn } from '../types';
+import type {
+  Account,
+  AppState,
+  Category,
+  Override,
+  Person,
+  Recurring,
+  SettlementRecord,
+  Settings,
+  Txn,
+} from '../types';
 import { buildSeedState, emptyState } from '../data/seed';
 import { overrideKey } from './compute';
 import { getSharedDoc, type DocRef } from './platform';
@@ -18,6 +28,8 @@ export type Action =
   | { type: 'txn/save'; txn: Txn }
   | { type: 'txn/delete'; id: string }
   | { type: 'override/set'; recurringId: string; ym: string; patch: Override | null }
+  | { type: 'settlement/save'; record: SettlementRecord }
+  | { type: 'settlement/delete'; id: string }
   | { type: 'settings/update'; patch: Partial<Settings> }
   | { type: 'state/replace'; state: AppState }
   | { type: 'state/reset'; mode: 'seed' | 'empty' };
@@ -80,6 +92,17 @@ export function reducer(state: AppState, action: Action): AppState {
       else overrides[key] = { ...overrides[key], ...action.patch };
       return { ...state, overrides };
     }
+    case 'settlement/save':
+      return { ...state, settlements: upsert(state.settlements ?? [], action.record) };
+    case 'settlement/delete': {
+      const record = (state.settlements ?? []).find((r) => r.id === action.id);
+      return {
+        ...state,
+        settlements: (state.settlements ?? []).filter((r) => r.id !== action.id),
+        // ההעברה שנרשמה יחד עם הסימון מוסרת גם היא, כדי שהיתרות יישארו נכונות
+        txns: record?.txnId ? state.txns.filter((t) => t.id !== record.txnId) : state.txns,
+      };
+    }
     case 'settings/update':
       return { ...state, settings: { ...state.settings, ...action.patch } };
     case 'state/replace':
@@ -111,7 +134,7 @@ function loadState(): AppState {
     if (!raw) return buildSeedState();
     const parsed = JSON.parse(raw);
     if (!isValidState(parsed)) return buildSeedState();
-    return { ...buildSeedState(), ...parsed, overrides: parsed.overrides ?? {} };
+    return { ...buildSeedState(), ...parsed, overrides: parsed.overrides ?? {}, settlements: parsed.settlements ?? [] };
   } catch {
     return buildSeedState();
   }

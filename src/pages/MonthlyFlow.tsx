@@ -5,7 +5,7 @@ import { Card, ConfirmButton, EmptyState, Field, Modal, Stat } from '../componen
 import { TxnForm } from '../components/forms';
 import { buildLedger, summarizeMonth } from '../lib/compute';
 import { formatDate, monthLabel } from '../lib/dates';
-import { personColor, STATUS_LABEL, TYPE_LABEL } from '../lib/colors';
+import { accountColor, STATUS_LABEL, TYPE_LABEL } from '../lib/colors';
 import type { LedgerEntry, OccurrenceStatus, Txn } from '../types';
 
 export default function MonthlyFlow({ ym }: { ym: string }) {
@@ -131,7 +131,7 @@ export default function MonthlyFlow({ ym }: { ym: string }) {
                       <td className="small">{cat ? `${cat.emoji} ${cat.name}` : <span className="muted">—</span>}</td>
                       <td className="small">
                         <span className="name-cell">
-                          <i className="swatch" style={{ background: personColor(state.persons, acc?.ownerId) }} />
+                          <i className="swatch" style={{ background: accountColor(state.accounts, state.persons, e.accountId) }} />
                           {acc?.name ?? '—'}
                           {toAcc && <span className="muted"> ← {toAcc.name}</span>}
                         </span>

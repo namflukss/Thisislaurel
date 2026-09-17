@@ -32,6 +32,8 @@ export interface Account {
   /** יתרת פתיחה נכון לתאריך openingDate */
   openingBalance: number;
   openingDate: string; // YYYY-MM-DD
+  /** צבע מותאם לחשבון. ריק = הצבע של בעל החשבון */
+  color?: string;
   archived?: boolean;
   note?: string;
 }
@@ -43,8 +45,6 @@ export interface Category {
   group: string;
   type: 'expense' | 'income';
   emoji: string;
-  /** תקציב חודשי יעד (אופציונלי) */
-  monthlyBudget?: number;
   /** צבע מותאם אישית לקטגוריה בגרפים וברשימות */
   color?: string;
   archived?: boolean;
@@ -102,6 +102,23 @@ export interface Override {
 /** מפתח: `${recurringId}|${YYYY-MM}` */
 export type Overrides = Record<string, Override>;
 
+/** רישום של איזון שבוצע בפועל בין בני הבית, לתקופה מסוימת */
+export interface SettlementRecord {
+  id: string;
+  /** התקופה שעליה בוצע האיזון (חודש בודד: fromMonth === toMonth) */
+  fromMonth: string; // YYYY-MM
+  toMonth: string; // YYYY-MM
+  /** מי השלים למי */
+  fromPersonId: string;
+  toPersonId: string;
+  amount: number;
+  /** מתי סומן כהוסדר */
+  settledOn: string; // YYYY-MM-DD
+  /** מזהה ההעברה שנרשמה בפועל, אם נרשמה */
+  txnId?: string;
+  note?: string;
+}
+
 export type SplitMode = 'equal' | 'income' | 'custom';
 
 export interface Settings {
@@ -125,6 +142,8 @@ export interface AppState {
   recurring: Recurring[];
   txns: Txn[];
   overrides: Overrides;
+  /** איזונים שכבר בוצעו בין בני הבית */
+  settlements: SettlementRecord[];
   settings: Settings;
 }
 

@@ -29,9 +29,10 @@ export function personColor(persons: Person[], personId?: string): string {
   return person?.color || defaultPersonColor(persons, personId);
 }
 
+/** צבע החשבון: הצבע שנבחר לו, ואם אין – הצבע של בעליו */
 export function accountColor(accounts: Account[], persons: Person[], accountId?: string): string {
   const acc = accounts.find((a) => a.id === accountId);
-  return personColor(persons, acc?.ownerId);
+  return acc?.color || personColor(persons, acc?.ownerId);
 }
 
 export const ACCOUNT_KIND_LABEL: Record<Account['kind'], string> = {

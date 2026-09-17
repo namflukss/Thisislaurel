@@ -4,7 +4,7 @@ import { ColorPicker, Field, FieldGroup } from './ui';
 import { useStore, newId } from '../lib/store';
 import { todayISO } from '../lib/dates';
 import { FREQUENCY_LABEL } from '../lib/compute';
-import { ACCOUNT_KIND_LABEL } from '../lib/colors';
+import { ACCOUNT_KIND_LABEL, personColor } from '../lib/colors';
 import { WEEKDAY_NAMES } from '../lib/dates';
 
 const EMOJIS = ['🏠', '🏢', '🧾', '💡', '🚿', '🔥', '📶', '📱', '🔧', '🎒', '🧸', '⚽', '👕', '👶', '🛒', '🍽️', '⛽', '🚗', '🚌', '🩺', '🛡️', '🚙', '💊', '🎬', '🏋️', '🎭', '🎁', '🧴', '🏦', '📦', '💼', '💻', '🏛️', '↩️', '✨', '🐾', '✈️', '📚'];
@@ -380,6 +380,13 @@ export function AccountForm({ initial, onDone }: { initial?: Account; onDone: ()
         <Field label="הערה">
           <input value={form.note ?? ''} onChange={(e) => set('note', e.target.value || undefined)} />
         </Field>
+        <FieldGroup label="צבע החשבון" hint="ברירת מחדל = הצבע של בעל החשבון" full>
+          <ColorPicker
+            value={form.color}
+            defaultSwatch={personColor(state.persons, form.ownerId)}
+            onChange={(color) => set('color', color)}
+          />
+        </FieldGroup>
       </div>
       <div className="modal-actions">
         <button type="submit" className="btn primary">
@@ -429,15 +436,6 @@ export function CategoryForm({ initial, onDone }: { initial?: Category; onDone: 
             <option value="expense">הוצאה</option>
             <option value="income">הכנסה</option>
           </select>
-        </Field>
-        <Field label="תקציב חודשי (₪)" hint="ריק = ללא מעקב תקציב">
-          <input
-            inputMode="decimal"
-            value={form.monthlyBudget ?? ''}
-            onChange={(e) =>
-              set('monthlyBudget', e.target.value ? Math.abs(Number(e.target.value.replace(/[^\d.-]/g, ''))) : undefined)
-            }
-          />
         </Field>
         <FieldGroup label="צבע" hint="משמש בגרף הקטגוריות וברשימות. ברירת מחדל = גוון לפי גודל ההוצאה" full>
           <ColorPicker value={form.color} onChange={(color) => set('color', color)} />

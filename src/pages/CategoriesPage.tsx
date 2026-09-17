@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../lib/store';
 import { useMoneyFormat } from '../lib/format';
-import { Card, ConfirmButton, Meter, Modal, Stat } from '../components/ui';
+import { Card, ConfirmButton, Modal, Stat } from '../components/ui';
 import { CategoryForm } from '../components/forms';
 import { summarizeMonth } from '../lib/compute';
 import { lastMonths, monthLabel } from '../lib/dates';
@@ -17,7 +17,7 @@ export default function CategoriesPage({ ym }: { ym: string }) {
   const summary = useMemo(() => summarizeMonth(state, ym), [state, ym]);
   const months = useMemo(() => lastMonths(ym, 3), [ym]);
 
-  /** ממוצע 3 חודשים אחרונים לכל קטגוריה – בסיס טוב לקביעת תקציב */
+  /** ממוצע 3 חודשים אחרונים לכל קטגוריה – נותן תמונה יציבה יותר מחודש בודד */
   const averages = useMemo(() => {
     const totals = new Map<string, number>();
     for (const m of months) {
@@ -37,25 +37,24 @@ export default function CategoriesPage({ ym }: { ym: string }) {
   const categories = state.categories.filter((c) => c.type === type);
   const groups = [...new Set(categories.map((c) => c.group))];
 
-  const budgetTotal = categories.reduce((s, c) => s + (c.monthlyBudget ?? 0), 0);
   const actualTotal = type === 'expense' ? summary.expense : summary.income;
+  const averageTotal = categories.reduce((sum, c) => sum + (averages.get(c.id) ?? 0), 0);
 
   return (
     <>
       <div className="grid grid-3">
         <Stat label="קטגוריות" value={String(categories.length)} foot={`ב-${groups.length} קבוצות`} />
-        <Stat label="סך התקציב החודשי" value={money(budgetTotal)} foot="סכום התקציבים שהוגדרו" />
         <Stat
           label={`בפועל ב${monthLabel(ym)}`}
           value={money(actualTotal)}
           color={type === 'expense' ? 'var(--expense)' : 'var(--income)'}
-          foot={budgetTotal ? `${Math.round((actualTotal / budgetTotal) * 100)}% מהתקציב` : undefined}
         />
+        <Stat label="ממוצע 3 חודשים" value={money(averageTotal)} foot="בסיס השוואה לחודש הנוכחי" />
       </div>
 
       <Card
-        title="קטגוריות ותקציבים"
-        subtitle="כל קטגוריה שייכת לקבוצה, ואפשר להגדיר לה תקציב חודשי, סמל וצבע משלה. שינוי הצבעים של בני הבית נמצא במסך ההגדרות."
+        title="קטגוריות"
+        subtitle="כל קטגוריה שייכת לקבוצה, ואפשר לתת לה סמל וצבע משלה. שינוי הצבעים של בני הבית נמצא במסך ההגדרות."
         actions={
           <div style={{ display: 'flex', gap: 6 }}>
             <button
@@ -97,8 +96,8 @@ export default function CategoriesPage({ ym }: { ym: string }) {
                         <th>קטגוריה</th>
                         <th className="num">בפועל החודש</th>
                         <th className="num">ממוצע 3 חודשים</th>
-                        <th className="num">תקציב</th>
-                        <th style={{ width: 140 }}>ניצול</th>
+                        <th className="num">מול הממוצע</th>
+                        <th className="num">חלק מהחודש</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -121,21 +120,17 @@ export default function CategoriesPage({ ym }: { ym: string }) {
                             </td>
                             <td className="num">{actual ? money(actual) : <span className="muted">—</span>}</td>
                             <td className="num muted">{avg ? money(avg) : '—'}</td>
-                            <td className="num">{c.monthlyBudget ? money(c.monthlyBudget) : <span className="muted">—</span>}</td>
-                            <td>
-                              {c.monthlyBudget ? (
-                                <div>
-                                  <Meter value={actual} max={c.monthlyBudget} />
-                                  <span className="small muted nums">
-                                    {Math.round((actual / c.monthlyBudget) * 100)}%
-                                    {actual > c.monthlyBudget && (
-                                      <strong style={{ color: 'var(--critical)' }}> · חריגה של {money(actual - c.monthlyBudget)}</strong>
-                                    )}
-                                  </span>
-                                </div>
+                            <td className="num small">
+                              {avg && actual ? (
+                                <span className="muted">
+                                  {actual >= avg ? '▲' : '▼'} {money(Math.abs(actual - avg))}
+                                </span>
                               ) : (
-                                <span className="small muted">ללא תקציב</span>
+                                <span className="muted">—</span>
                               )}
+                            </td>
+                            <td className="num small muted">
+                              {actual && actualTotal ? `${Math.round((actual / actualTotal) * 100)}%` : '—'}
                             </td>
                             <td>
                               <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>

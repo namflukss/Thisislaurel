@@ -4,7 +4,7 @@ import { useMoneyFormat } from '../lib/format';
 import { Card, ConfirmButton, EmptyState, Modal, Stat } from '../components/ui';
 import { RecurringForm } from '../components/forms';
 import { annualAmount, FREQUENCY_LABEL, monthlyEquivalent } from '../lib/compute';
-import { personColor } from '../lib/colors';
+import { accountColor } from '../lib/colors';
 import type { Recurring } from '../types';
 
 type Tab = 'expense' | 'income' | 'transfer';
@@ -170,7 +170,7 @@ export default function RecurringPage() {
                       <td className="small">{cat ? `${cat.emoji} ${cat.name}` : <span className="muted">—</span>}</td>
                       <td className="small">
                         <span className="name-cell">
-                          <i className="swatch" style={{ background: personColor(state.persons, acc?.ownerId) }} />
+                          <i className="swatch" style={{ background: accountColor(state.accounts, state.persons, r.accountId) }} />
                           {acc?.name ?? '—'}
                           {toAcc && <span className="muted"> ← {toAcc.name}</span>}
                         </span>

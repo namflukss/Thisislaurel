@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../lib/store';
 import { useMoneyFormat } from '../lib/format';
-import { Card, EmptyState, Meter, Stat } from '../components/ui';
+import { Card, EmptyState, Stat } from '../components/ui';
 import { RankBars, StackedShare, TrendColumns } from '../components/charts';
 import {
   accountBalances,
@@ -10,7 +10,7 @@ import {
   summarizeMonth,
 } from '../lib/compute';
 import { addMonths, formatDate, lastMonths, monthLabel, todayISO } from '../lib/dates';
-import { personColor } from '../lib/colors';
+import { accountColor, personColor } from '../lib/colors';
 import { plural } from '../lib/text';
 
 export default function Dashboard({ ym, onNavigate }: { ym: string; onNavigate: (tab: string) => void }) {
@@ -24,7 +24,6 @@ export default function Dashboard({ ym, onNavigate }: { ym: string; onNavigate: 
   const settlement = useMemo(() => settle(state, [ym]), [state, ym]);
 
   const categoryById = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
-  const accountById = useMemo(() => new Map(state.accounts.map((a) => [a.id, a])), [state.accounts]);
   const personById = useMemo(() => new Map(state.persons.map((p) => [p.id, p])), [state.persons]);
 
   const expenseDelta = summary.expense - prev.expense;
@@ -52,14 +51,6 @@ export default function Dashboard({ ym, onNavigate }: { ym: string; onNavigate: 
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 6);
 
-  const budgetRows = summary.expenseByCategory
-    .map((b) => ({ cat: categoryById.get(b.id), amount: b.amount }))
-    .filter((r) => r.cat?.monthlyBudget)
-    .map((r) => ({ ...r, budget: r.cat!.monthlyBudget!, ratio: r.amount / r.cat!.monthlyBudget! }))
-    .sort((a, b) => b.ratio - a.ratio)
-    .slice(0, 6);
-
-  const totalBudget = state.categories.reduce((s, c) => s + (c.monthlyBudget ?? 0), 0);
 
   return (
     <>
@@ -134,7 +125,7 @@ export default function Dashboard({ ym, onNavigate }: { ym: string; onNavigate: 
                     <tr key={a.id}>
                       <td>
                         <span className="name-cell">
-                          <i className="swatch" style={{ background: personColor(state.persons, a.ownerId) }} />
+                          <i className="swatch" style={{ background: accountColor(state.accounts, state.persons, a.id) }} />
                           {a.name}
                         </span>
                       </td>
@@ -196,30 +187,6 @@ export default function Dashboard({ ym, onNavigate }: { ym: string; onNavigate: 
         </Card>
 
         <div className="stack">
-          <Card title="מעקב תקציב" subtitle={totalBudget ? `תקציב חודשי מוגדר: ${money(totalBudget)}` : undefined}>
-            {budgetRows.length ? (
-              <ul className="list-reset stack">
-                {budgetRows.map((r) => (
-                  <li key={r.cat!.id}>
-                    <div className="row-between small">
-                      <span className="name-cell">
-                        <span className="emoji">{r.cat!.emoji}</span>
-                        {r.cat!.name}
-                      </span>
-                      <span className="nums muted">
-                        {money(r.amount)} / {money(r.budget)}
-                        {r.ratio > 1 && <strong style={{ color: 'var(--critical)' }}> ⚠ חריגה</strong>}
-                      </span>
-                    </div>
-                    <Meter value={r.amount} max={r.budget} />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState title="לא הוגדרו תקציבים">אפשר להגדיר תקציב חודשי לכל קטגוריה במסך הקטגוריות.</EmptyState>
-            )}
-          </Card>
-
           <Card title="תשלומים שעוד צפויים החודש">
             {upcoming.length ? (
               <table className="data">
@@ -229,7 +196,7 @@ export default function Dashboard({ ym, onNavigate }: { ym: string; onNavigate: 
                       <td className="muted small nums">{formatDate(e.date)}</td>
                       <td>
                         <span className="name-cell">
-                          <i className="swatch" style={{ background: personColor(state.persons, accountById.get(e.accountId)?.ownerId) }} />
+                          <i className="swatch" style={{ background: accountColor(state.accounts, state.persons, e.accountId) }} />
                           {e.name}
                         </span>
                       </td>

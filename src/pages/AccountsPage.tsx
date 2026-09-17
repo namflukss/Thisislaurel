@@ -5,7 +5,7 @@ import { Card, ConfirmButton, Modal, Stat } from '../components/ui';
 import { AccountForm } from '../components/forms';
 import { Sparkline } from '../components/charts';
 import { accountBalances, buildLedger, summarizeMonth } from '../lib/compute';
-import { ACCOUNT_KIND_LABEL, personColor } from '../lib/colors';
+import { ACCOUNT_KIND_LABEL, accountColor, personColor } from '../lib/colors';
 import { formatDate, lastMonths, monthLabel } from '../lib/dates';
 import { plural } from '../lib/text';
 import type { Account } from '../types';
@@ -86,7 +86,7 @@ export default function AccountsPage({ ym }: { ym: string }) {
         <div className="grid grid-2">
           {state.accounts.map((a) => {
             const f = flows.get(a.id)!;
-            const color = personColor(state.persons, a.ownerId);
+            const color = accountColor(state.accounts, state.persons, a.id);
             const owner = state.persons.find((p) => p.id === a.ownerId);
             return (
               <div className="card" key={a.id} style={{ borderInlineStartWidth: 4, borderInlineStartColor: color }}>
@@ -177,7 +177,7 @@ export default function AccountsPage({ ym }: { ym: string }) {
                   <tr key={a.id}>
                     <td>
                       <span className="name-cell">
-                        <i className="swatch" style={{ background: personColor(state.persons, a.ownerId) }} />
+                        <i className="swatch" style={{ background: accountColor(state.accounts, state.persons, a.id) }} />
                         {a.name}
                       </span>
                     </td>

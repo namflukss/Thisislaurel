@@ -4,7 +4,7 @@ import { useMoneyFormat } from '../lib/format';
 import { Card, ConfirmButton, EmptyState, Modal, Stat } from '../components/ui';
 import { TxnForm } from '../components/forms';
 import { formatDate, monthLabel, monthOf } from '../lib/dates';
-import { personColor, TYPE_LABEL } from '../lib/colors';
+import { accountColor, TYPE_LABEL } from '../lib/colors';
 import type { Txn } from '../types';
 
 export default function TransactionsPage() {
@@ -118,7 +118,7 @@ export default function TransactionsPage() {
                             <td className="small muted">{cat?.name ?? TYPE_LABEL[t.type]}</td>
                             <td className="small">
                               <span className="name-cell">
-                                <i className="swatch" style={{ background: personColor(state.persons, acc?.ownerId) }} />
+                                <i className="swatch" style={{ background: accountColor(state.accounts, state.persons, t.accountId) }} />
                                 {acc?.name}
                                 {toAcc && <span className="muted"> ← {toAcc.name}</span>}
                               </span>

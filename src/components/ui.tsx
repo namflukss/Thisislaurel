@@ -178,16 +178,6 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
   );
 }
 
-export function Meter({ value, max }: { value: number; max: number }) {
-  const ratio = max > 0 ? value / max : 0;
-  const cls = ratio > 1 ? 'meter over' : ratio > 0.85 ? 'meter warn' : 'meter';
-  return (
-    <div className={cls} role="img" aria-label={`${Math.round(ratio * 100)} אחוז מהתקציב`}>
-      <span style={{ width: `${Math.min(ratio, 1) * 100}%` }} />
-    </div>
-  );
-}
-
 /** כפתור מחיקה עם אישור בלחיצה שנייה – מונע מחיקות בטעות בלי דיאלוג נוסף */
 export function ConfirmButton({
   onConfirm,
