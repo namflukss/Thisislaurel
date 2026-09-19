@@ -4,7 +4,9 @@ import type {
   Category,
   LedgerEntry,
   OccurrenceStatus,
+  Person,
   Recurring,
+  SplitKind,
 } from '../types';
 import {
   addMonths,
@@ -62,6 +64,38 @@ export function occurrenceDates(rec: Recurring, ym: string): string[] {
   return within(d) ? [d] : [];
 }
 
+/**
+ * האם שורה נכללת באיזון. סימון בשורה עצמה קודם להגדרת הקטגוריה,
+ * וברירת המחדל היא הוצאה משותפת.
+ */
+export function resolveSplit(
+  entry: { split?: SplitKind; categoryId?: string },
+  categories: Map<string, Category>,
+): SplitKind {
+  if (entry.split) return entry.split;
+  const category = entry.categoryId ? categories.get(entry.categoryId) : undefined;
+  return category?.personalByDefault ? 'personal' : 'shared';
+}
+
+/**
+ * למי מיוחסת הוצאה שסומנה כאישית: מי שסומן בשורה, ואם לא סומן – בעל החשבון
+ * ששילם. הוצאה אישית שיצאה מחשבון משותף בלי שיוך אינה ניתנת לייחוס, ולכן
+ * תיחשב משותפת (המסכים מסמנים אותה כ"חסר שיוך" כדי שאפשר יהיה לתקן).
+ */
+export function personalBeneficiary(
+  entry: { split?: SplitKind; categoryId?: string; accountId: string; forPersonId?: string },
+  categories: Map<string, Category>,
+  accounts: Account[],
+  persons: Person[],
+): string | undefined {
+  if (resolveSplit(entry, categories) !== 'personal') return undefined;
+  const marked = entry.forPersonId ? persons.find((p) => p.id === entry.forPersonId) : undefined;
+  if (marked?.isIndividual) return marked.id;
+  const ownerId = accounts.find((a) => a.id === entry.accountId)?.ownerId;
+  const owner = ownerId ? persons.find((p) => p.id === ownerId) : undefined;
+  return owner?.isIndividual ? owner.id : undefined;
+}
+
 export function overrideKey(recurringId: string, ym: string): string {
   return `${recurringId}|${ym}`;
 }
@@ -93,6 +127,8 @@ export function buildLedger(state: AppState, ym: string): LedgerEntry[] {
         recurringId: rec.id,
         status: ov.status ?? defaultStatus(date),
         variable: rec.variable,
+        split: rec.split,
+        forPersonId: rec.forPersonId,
         note: rec.note,
       });
     }
@@ -113,6 +149,8 @@ export function buildLedger(state: AppState, ym: string): LedgerEntry[] {
       source: 'once',
       txnId: t.id,
       status: 'paid',
+      split: t.split,
+      forPersonId: t.forPersonId,
       note: t.note,
     });
   }
@@ -258,13 +296,17 @@ export interface PersonSettlement {
   personId: string;
   /** הכנסות שנרשמו על שמו בתקופה */
   income: number;
-  /** הוצאות ששולמו מהחשבונות הפרטיים שלו */
-  personalExpense: number;
+  /** הוצאות משותפות ששולמו מהחשבונות הפרטיים שלו */
+  sharedFromOwnAccount: number;
   /** כסף שהעביר/הפקיד לחשבון המשותף */
   jointFunding: number;
-  /** חלקו במימון ההוצאות מהחשבון המשותף */
+  /** הוצאות שסומנו כאישיות ומיוחסות אליו – אינן נכללות באיזון */
+  personalExpense: number;
+  /** מתוכן, כמה שולמו מהחשבון המשותף (משיכה אישית מהקופה) */
+  personalFromJoint: number;
+  /** חלקו במימון ההוצאות המשותפות שיצאו מהחשבון המשותף */
   jointShareAmount: number;
-  /** סך ההוצאה המשפחתית שנשא בפועל */
+  /** סך ההוצאה המשותפת שנשא בפועל */
   borne: number;
   /** החלק ההוגן לפי שיטת החלוקה שנבחרה */
   fairShare: number;
@@ -274,7 +316,13 @@ export interface PersonSettlement {
 }
 
 export interface Settlement {
+  /** סך ההוצאות בתקופה, כולל האישיות */
   totalExpense: number;
+  /** ההוצאות שנכללות באיזון */
+  sharedExpense: number;
+  /** ההוצאות שסומנו כאישיות ואינן נכללות באיזון */
+  personalExpense: number;
+  /** הוצאות משותפות ששולמו מהחשבון המשותף */
   jointExpense: number;
   jointFundingTotal: number;
   persons: PersonSettlement[];
@@ -293,22 +341,37 @@ export function settle(state: AppState, months: string[]): Settlement {
   };
 
   const individuals = state.persons.filter((p) => p.isIndividual);
-  const personalExpense = new Map<string, number>();
+  const categories = categoryLookup(state.categories);
+  /** הוצאות משותפות ששולמו מחשבון פרטי */
+  const sharedFromOwn = new Map<string, number>();
+  /** הוצאות שסומנו כאישיות, לפי מי שהן שלו */
+  const personalByPerson = new Map<string, number>();
+  /** מתוכן – מה שיצא מהחשבון המשותף, כלומר משיכה אישית מהקופה */
+  const personalFromJoint = new Map<string, number>();
   const jointFunding = new Map<string, number>();
   const incomeByPerson = new Map<string, number>();
   let jointExpense = 0;
+  let sharedExpense = 0;
+  let personalExpense = 0;
   let totalExpense = 0;
 
   for (const ym of months) {
     for (const e of activeEntries(buildLedger(state, ym))) {
       if (e.type === 'expense') {
         totalExpense += e.amount;
-        if (isJointAccount(e.accountId)) {
-          jointExpense += e.amount;
-        } else {
-          const owner = accountById.get(e.accountId)?.ownerId;
-          if (owner) bump(personalExpense, owner, e.amount);
+        const ownerId = accountById.get(e.accountId)?.ownerId;
+        const who = personalBeneficiary(e, categories, state.accounts, state.persons);
+        if (who) {
+          personalExpense += e.amount;
+          bump(personalByPerson, who, e.amount);
+          if (isJointAccount(e.accountId)) bump(personalFromJoint, who, e.amount);
+          continue;
         }
+        // הוצאה אישית ללא שיוך נחשבת משותפת, כדי שלא תיעלם מהחישוב
+
+        sharedExpense += e.amount;
+        if (isJointAccount(e.accountId)) jointExpense += e.amount;
+        else if (ownerId) bump(sharedFromOwn, ownerId, e.amount);
       } else if (e.type === 'income') {
         const person = e.personId ?? accountById.get(e.accountId)?.ownerId;
         if (person) bump(incomeByPerson, person, e.amount);
@@ -343,18 +406,31 @@ export function settle(state: AppState, months: string[]): Settlement {
     }
   }
 
+  /**
+   * משיכה אישית מהקופה המשותפת מקטינה את המימון שלו נחשב כתרומה להוצאות
+   * המשותפות – אחרת היה יוצא שהקופה מימנה הוצאה אישית על חשבון שני הצדדים.
+   */
+  const netFunding = new Map<string, number>();
+  for (const p of individuals) {
+    netFunding.set(p.id, (jointFunding.get(p.id) ?? 0) - (personalFromJoint.get(p.id) ?? 0));
+  }
+  const netFundingTotal = individuals.reduce((s, p) => s + (netFunding.get(p.id) ?? 0), 0);
+
   const persons: PersonSettlement[] = individuals.map((p) => {
     const funding = jointFunding.get(p.id) ?? 0;
-    const fundingShare = jointFundingTotal > 0 ? funding / jointFundingTotal : (ratios.get(p.id) ?? 0);
+    const fundingShare =
+      netFundingTotal > 0 ? (netFunding.get(p.id) ?? 0) / netFundingTotal : (ratios.get(p.id) ?? 0);
     const jointShareAmount = jointExpense * fundingShare;
-    const personal = personalExpense.get(p.id) ?? 0;
-    const borne = personal + jointShareAmount;
-    const fairShare = totalExpense * (ratios.get(p.id) ?? 0);
+    const fromOwn = sharedFromOwn.get(p.id) ?? 0;
+    const borne = fromOwn + jointShareAmount;
+    const fairShare = sharedExpense * (ratios.get(p.id) ?? 0);
     return {
       personId: p.id,
       income: incomeByPerson.get(p.id) ?? 0,
-      personalExpense: personal,
+      sharedFromOwnAccount: fromOwn,
       jointFunding: funding,
+      personalExpense: personalByPerson.get(p.id) ?? 0,
+      personalFromJoint: personalFromJoint.get(p.id) ?? 0,
       jointShareAmount,
       borne,
       fairShare,
@@ -381,7 +457,16 @@ export function settle(state: AppState, months: string[]): Settlement {
         ? 'חלוקה יחסית להכנסות'
         : 'חלוקה מותאמת אישית';
 
-  return { totalExpense, jointExpense, jointFundingTotal, persons, transfer, modeLabel };
+  return {
+    totalExpense,
+    sharedExpense,
+    personalExpense,
+    jointExpense,
+    jointFundingTotal,
+    persons,
+    transfer,
+    modeLabel,
+  };
 }
 
 export interface CategoryTrend {

@@ -54,7 +54,7 @@ export default function CategoriesPage({ ym }: { ym: string }) {
 
       <Card
         title="קטגוריות"
-        subtitle="כל קטגוריה שייכת לקבוצה, ואפשר לתת לה סמל וצבע משלה. שינוי הצבעים של בני הבית נמצא במסך ההגדרות."
+        subtitle="כל קטגוריה שייכת לקבוצה, ואפשר לתת לה סמל, צבע, ולסמן אותה כאישית – כלומר שההוצאות בה לא ייכללו באיזון בין בני הבית."
         actions={
           <div style={{ display: 'flex', gap: 6 }}>
             <button
@@ -116,6 +116,11 @@ export default function CategoriesPage({ ym }: { ym: string }) {
                                 />
                                 <span className="emoji">{c.emoji}</span>
                                 {c.name}
+                                {c.personalByDefault && (
+                                  <span className="pill muted small" title="אישית – לא נכללת באיזון">
+                                    אישית
+                                  </span>
+                                )}
                               </span>
                             </td>
                             <td className="num">{actual ? money(actual) : <span className="muted">—</span>}</td>

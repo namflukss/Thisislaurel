@@ -3,10 +3,10 @@ import { useStore } from '../lib/store';
 import { useMoneyFormat } from '../lib/format';
 import { Card, ConfirmButton, EmptyState, Field, Modal, Stat } from '../components/ui';
 import { TxnForm } from '../components/forms';
-import { buildLedger, summarizeMonth } from '../lib/compute';
+import { buildLedger, personalBeneficiary, resolveSplit, summarizeMonth } from '../lib/compute';
 import { formatDate, monthLabel } from '../lib/dates';
-import { accountColor, STATUS_LABEL, TYPE_LABEL } from '../lib/colors';
-import type { LedgerEntry, OccurrenceStatus, Txn } from '../types';
+import { accountColor, personColor, STATUS_LABEL, TYPE_LABEL } from '../lib/colors';
+import type { LedgerEntry, OccurrenceStatus, SplitKind, Txn } from '../types';
 
 export default function MonthlyFlow({ ym }: { ym: string }) {
   const { state, dispatch } = useStore();
@@ -17,6 +17,7 @@ export default function MonthlyFlow({ ym }: { ym: string }) {
   const [editing, setEditing] = useState<Txn | null>(null);
   const [adding, setAdding] = useState(false);
   const [amountEdit, setAmountEdit] = useState<LedgerEntry | null>(null);
+  const [attributing, setAttributing] = useState<LedgerEntry | null>(null);
 
   const summary = useMemo(() => summarizeMonth(state, ym), [state, ym]);
   const entries = useMemo(() => buildLedger(state, ym), [state, ym]);
@@ -37,6 +38,29 @@ export default function MonthlyFlow({ ym }: { ym: string }) {
   const setStatus = (e: LedgerEntry, status: OccurrenceStatus) => {
     if (!e.recurringId) return;
     dispatch({ type: 'override/set', recurringId: e.recurringId, ym, patch: { status } });
+  };
+
+  /** סימון שורה כמשותפת או כאישית. בשורה קבועה השינוי חל על כל החודשים. */
+  const applySplit = (e: LedgerEntry, split: SplitKind, forPersonId?: string) => {
+    if (e.txnId) {
+      const txn = state.txns.find((t) => t.id === e.txnId);
+      if (txn) dispatch({ type: 'txn/save', txn: { ...txn, split, forPersonId } });
+    } else if (e.recurringId) {
+      const rec = state.recurring.find((r) => r.id === e.recurringId);
+      if (rec) dispatch({ type: 'recurring/save', recurring: { ...rec, split, forPersonId } });
+    }
+  };
+
+  const toggleSplit = (e: LedgerEntry) => {
+    if (resolveSplit(e, categoryById) === 'personal') {
+      applySplit(e, 'shared', undefined);
+      return;
+    }
+    // הוצאה מחשבון משותף – צריך לדעת של מי היא, אחרת אין למי לייחס אותה
+    const owner = state.accounts.find((a) => a.id === e.accountId)?.ownerId;
+    const ownerIsIndividual = state.persons.find((p) => p.id === owner)?.isIndividual;
+    if (ownerIsIndividual) applySplit(e, 'personal', undefined);
+    else setAttributing(e);
   };
 
   const resetOverride = (e: LedgerEntry) => {
@@ -125,6 +149,28 @@ export default function MonthlyFlow({ ym }: { ym: string }) {
                         <span className="name-cell">
                           <span>{e.name}</span>
                           {e.variable && <span className="pill muted small">הערכה</span>}
+                          {e.type === 'expense' && resolveSplit(e, categoryById) === 'personal' && (
+                            personalBeneficiary(e, categoryById, state.accounts, state.persons) ? (
+                              <span className="pill muted small" title="אישי – לא נכלל באיזון">
+                                אישי ·{' '}
+                                {
+                                  state.persons.find(
+                                    (x) =>
+                                      x.id === personalBeneficiary(e, categoryById, state.accounts, state.persons),
+                                  )?.name
+                                }
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="pill warn-pill small"
+                                onClick={() => setAttributing(e)}
+                                title="סומן כאישי אך לא ידוע של מי – עד שייבחר, ההוצאה נכללת באיזון"
+                              >
+                                אישי · חסר שיוך
+                              </button>
+                            )
+                          )}
                         </span>
                         {e.note && <div className="sub muted small">{e.note}</div>}
                       </td>
@@ -145,6 +191,20 @@ export default function MonthlyFlow({ ym }: { ym: string }) {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                          {e.type === 'expense' && (
+                            <button
+                              type="button"
+                              className="btn small ghost"
+                              onClick={() => toggleSplit(e)}
+                              title={
+                                e.source === 'recurring'
+                                  ? 'החלפה בין משותף לאישי – חל על כל החודשים של החיוב הקבוע'
+                                  : 'החלפה בין משותף לאישי'
+                              }
+                            >
+                              {resolveSplit(e, categoryById) === 'personal' ? 'למשותף' : 'לאישי'}
+                            </button>
+                          )}
                           {e.source === 'recurring' ? (
                             <>
                               {e.status !== 'paid' && (
@@ -206,6 +266,38 @@ export default function MonthlyFlow({ ym }: { ym: string }) {
           </p>
         )}
       </Card>
+
+      {attributing && (
+        <Modal title={`של מי ההוצאה? – ${attributing.name}`} onClose={() => setAttributing(null)}>
+          <p className="small muted" style={{ marginTop: 0 }}>
+            ההוצאה שולמה מ{state.accounts.find((a) => a.id === attributing.accountId)?.name}, ולכן צריך לדעת של מי
+            היא כדי להוציא אותה מהאיזון. מי שנבחר יישא בה לבד.
+            {attributing.source === 'recurring' && ' השינוי חל על כל החודשים של החיוב הקבוע.'}
+          </p>
+          <div className="toolbar">
+            {state.persons
+              .filter((p) => p.isIndividual)
+              .map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    applySplit(attributing, 'personal', p.id);
+                    setAttributing(null);
+                  }}
+                >
+                  <i className="swatch" style={{ background: personColor(state.persons, p.id) }} />
+                  {p.name}
+                </button>
+              ))}
+            <span className="spacer" />
+            <button type="button" className="btn ghost" onClick={() => setAttributing(null)}>
+              ביטול
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {amountEdit && (
         <AmountOverrideModal

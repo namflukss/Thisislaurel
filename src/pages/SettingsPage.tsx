@@ -125,7 +125,7 @@ export default function SettingsPage() {
 
       <Card
         title="שיטת החלוקה בהתחשבנות"
-        subtitle="קובעת איך מחושב 'החלק ההוגן' של כל אחד בהוצאות המשפחתיות בדוח ההתחשבנות"
+        subtitle="קובעת איך מחושב 'החלק ההוגן' של כל אחד בהוצאות המשותפות בדוח ההתחשבנות. הוצאות שסומנו כאישיות אינן נכללות בחלוקה כלל."
       >
         <div className="stack">
           {(Object.keys(SPLIT_LABEL) as SplitMode[]).map((mode) => (

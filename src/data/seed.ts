@@ -47,11 +47,11 @@ const CATEGORIES: Category[] = [
   { id: 'c-health', name: 'בריאות ותרופות', group: 'ביטוח ובריאות', type: 'expense', emoji: '💊' },
 
   // מנויים ופנאי
-  { id: 'c-subs', name: 'מנויים דיגיטליים', group: 'מנויים ופנאי', type: 'expense', emoji: '🎬' },
-  { id: 'c-gym', name: 'חדר כושר וספורט', group: 'מנויים ופנאי', type: 'expense', emoji: '🏋️' },
+  { id: 'c-subs', name: 'מנויים דיגיטליים', group: 'מנויים ופנאי', type: 'expense', emoji: '🎬', personalByDefault: true },
+  { id: 'c-gym', name: 'חדר כושר וספורט', group: 'מנויים ופנאי', type: 'expense', emoji: '🏋️', personalByDefault: true },
   { id: 'c-fun', name: 'בילויים ופנאי', group: 'מנויים ופנאי', type: 'expense', emoji: '🎭' },
   { id: 'c-gifts', name: 'מתנות ואירועים', group: 'מנויים ופנאי', type: 'expense', emoji: '🎁' },
-  { id: 'c-personal', name: 'הוצאות אישיות', group: 'מנויים ופנאי', type: 'expense', emoji: '🧴' },
+  { id: 'c-personal', name: 'הוצאות אישיות', group: 'מנויים ופנאי', type: 'expense', emoji: '🧴', personalByDefault: true },
 
   // חיסכון
   { id: 'c-savings', name: 'חיסכון והשקעות', group: 'חיסכון', type: 'expense', emoji: '🏦' },
@@ -162,13 +162,13 @@ function buildRecurring(start: string): Recurring[] {
       categoryId: 'c-personal', dayOfMonth: 1, variable: true,
     }),
     r('r-coffee-yuli', 'מסעדות וקפה – יולי', 'expense', 600, ACC_YULI, {
-      categoryId: 'c-restaurants', dayOfMonth: 1, variable: true,
+      categoryId: 'c-restaurants', dayOfMonth: 1, variable: true, split: 'personal',
     }),
     r('r-personal-naama', 'הוצאות אישיות – נעמה', 'expense', 1600, ACC_NAAMA, {
       categoryId: 'c-personal', dayOfMonth: 1, variable: true,
     }),
     r('r-fun-naama', 'בילויים – נעמה', 'expense', 500, ACC_NAAMA, {
-      categoryId: 'c-fun', dayOfMonth: 1, variable: true,
+      categoryId: 'c-fun', dayOfMonth: 1, variable: true, split: 'personal',
     }),
   ];
 }
@@ -190,6 +190,9 @@ function buildTxns(): Txn[] {
     t('t-1', dateInMonth(thisMonth, 3), 'ארוחה במסעדה', 'expense', 245, ACC_JOINT, { categoryId: 'c-restaurants' }),
     t('t-2', dateInMonth(thisMonth, 6), 'בגדים לילדים', 'expense', 380, ACC_NAAMA, { categoryId: 'c-kids' }),
     t('t-3', dateInMonth(thisMonth, 8), 'מתנה ליום הולדת', 'expense', 150, ACC_YULI, { categoryId: 'c-gifts' }),
+    t('t-10', dateInMonth(thisMonth, 11), 'נעליים לנעמה', 'expense', 420, ACC_NAAMA, {
+      categoryId: 'c-personal', split: 'personal',
+    }),
     t('t-4', dateInMonth(thisMonth, 9), 'תיקון מזגן', 'expense', 450, ACC_JOINT, { categoryId: 'c-home' }),
     t('t-5', dateInMonth(thisMonth, 12), 'בייביסיטר', 'expense', 220, ACC_JOINT, { categoryId: 'c-babysitter' }),
     t('t-6', dateInMonth(thisMonth, 14), 'החזר מס הכנסה', 'income', 1250, ACC_JOINT, {

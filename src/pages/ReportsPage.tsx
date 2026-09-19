@@ -179,7 +179,7 @@ export default function ReportsPage({ ym }: { ym: string }) {
 
       <Card
         title="התחשבנות בין בני הבית"
-        subtitle={`${settlement.modeLabel} · מחושב על ${plural(months.length, 'חודש', 'חודשים')}. ההוצאות מהחשבון המשותף מיוחסות לפי חלקו של כל אחד במימון החשבון.`}
+        subtitle={`${settlement.modeLabel} · מחושב על ${plural(months.length, 'חודש', 'חודשים')}. נכללות רק ההוצאות המשותפות; מה שסומן כאישי נשאר על מי שההוצאה שלו. ההוצאות מהחשבון המשותף מיוחסות לפי חלקו של כל אחד במימון החשבון.`}
       >
         <div className="table-wrap">
           <table className="data">
@@ -187,11 +187,12 @@ export default function ReportsPage({ ym }: { ym: string }) {
               <tr>
                 <th>שם</th>
                 <th className="num">הכנסות</th>
-                <th className="num">שולם מהחשבון הפרטי</th>
+                <th className="num">משותף ששולם מהפרטי</th>
                 <th className="num">הועבר למשותף</th>
                 <th className="num">חלק בהוצאות המשותפות</th>
                 <th className="num">סה״כ נשא</th>
                 <th className="num">החלק ההוגן</th>
+                <th className="num">אישי (לא באיזון)</th>
                 <th className="num">מאזן</th>
                 <th style={{ width: 120 }}>עודף / חוסר</th>
               </tr>
@@ -207,11 +208,17 @@ export default function ReportsPage({ ym }: { ym: string }) {
                     </span>
                   </td>
                   <td className="num">{money(p.income)}</td>
-                  <td className="num">{money(p.personalExpense)}</td>
+                  <td className="num">{money(p.sharedFromOwnAccount)}</td>
                   <td className="num">{money(p.jointFunding)}</td>
                   <td className="num">{money(p.jointShareAmount)}</td>
                   <td className="num">{money(p.borne)}</td>
                   <td className="num muted">{money(p.fairShare)}</td>
+                  <td className="num muted">
+                    {p.personalExpense ? money(p.personalExpense) : '—'}
+                    {p.personalFromJoint > 0 && (
+                      <div className="small muted">{money(p.personalFromJoint)} מהמשותף</div>
+                    )}
+                  </td>
                   <td className="num" style={{ color: p.balance >= 0 ? 'var(--income)' : 'var(--expense)', fontWeight: 700 }}>
                     {signed(p.balance)}
                   </td>
@@ -228,17 +235,26 @@ export default function ReportsPage({ ym }: { ym: string }) {
               <tr>
                 <td>סה״כ</td>
                 <td className="num">{money(income)}</td>
-                <td className="num">{money(settlement.totalExpense - settlement.jointExpense)}</td>
+                <td className="num">{money(settlement.sharedExpense - settlement.jointExpense)}</td>
                 <td className="num">{money(settlement.jointFundingTotal)}</td>
                 <td className="num">{money(settlement.jointExpense)}</td>
-                <td className="num">{money(settlement.totalExpense)}</td>
-                <td className="num">{money(settlement.totalExpense)}</td>
+                <td className="num">{money(settlement.sharedExpense)}</td>
+                <td className="num">{money(settlement.sharedExpense)}</td>
+                <td className="num">{money(settlement.personalExpense)}</td>
                 <td className="num">—</td>
                 <td />
               </tr>
             </tfoot>
           </table>
         </div>
+
+        {settlement.personalExpense > 0 && (
+          <p className="small muted" style={{ marginTop: 10, marginBottom: 0 }}>
+            מתוך {money(settlement.totalExpense)} הוצאות בתקופה, {money(settlement.personalExpense)} סומנו כאישיות
+            ואינן נכללות באיזון. סימון של תנועה בודדת נעשה בטופס שלה, וקטגוריה שלמה אפשר לסמן כאישית במסך
+            הקטגוריות.
+          </p>
+        )}
 
         {settledRecord ? (
           <div className="tip settled" style={{ marginTop: 12 }}>

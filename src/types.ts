@@ -2,6 +2,13 @@
 
 export type EntryType = 'expense' | 'income' | 'transfer';
 
+/**
+ * האם ההוצאה מתחלקת בין בני הבית או שהיא אישית.
+ * 'shared' – נכללת באיזון; 'personal' – מי שההוצאה שלו נושא בה לבד.
+ * ריק = לפי הגדרת הקטגוריה, שברירת המחדל שלה היא משותפת.
+ */
+export type SplitKind = 'shared' | 'personal';
+
 /** תדירות של תנועה קבועה */
 export type Frequency =
   | 'monthly'
@@ -45,6 +52,8 @@ export interface Category {
   group: string;
   type: 'expense' | 'income';
   emoji: string;
+  /** קטגוריה אישית – ההוצאות בה אינן נכללות באיזון, אלא אם סומן אחרת בתנועה עצמה */
+  personalByDefault?: boolean;
   /** צבע מותאם אישית לקטגוריה בגרפים וברשימות */
   color?: string;
   archived?: boolean;
@@ -73,6 +82,10 @@ export interface Recurring {
   active: boolean;
   /** סכום משתנה (חשמל, סופר) – מוצג כהערכה */
   variable?: boolean;
+  /** האם ההוצאה מתחלקת באיזון. ריק = לפי הקטגוריה */
+  split?: SplitKind;
+  /** של מי ההוצאה האישית. ריק = בעל החשבון שממנו שולמה */
+  forPersonId?: string;
   note?: string;
 }
 
@@ -87,6 +100,10 @@ export interface Txn {
   accountId: string;
   toAccountId?: string;
   personId?: string;
+  /** האם ההוצאה מתחלקת באיזון. ריק = לפי הקטגוריה */
+  split?: SplitKind;
+  /** של מי ההוצאה האישית. ריק = בעל החשבון שממנו שולמה */
+  forPersonId?: string;
   note?: string;
 }
 
@@ -163,5 +180,7 @@ export interface LedgerEntry {
   txnId?: string;
   status: OccurrenceStatus;
   variable?: boolean;
+  split?: SplitKind;
+  forPersonId?: string;
   note?: string;
 }

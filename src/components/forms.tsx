@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Account, Category, Recurring, Txn } from '../types';
+import type { Account, Category, Recurring, SplitKind, Txn } from '../types';
 import { ColorPicker, Field, FieldGroup } from './ui';
 import { useStore, newId } from '../lib/store';
 import { todayISO } from '../lib/dates';
@@ -45,6 +45,12 @@ export function RecurringForm({
   const categories = state.categories.filter(
     (c) => !c.archived && c.type === (form.type === 'income' ? 'income' : 'expense'),
   );
+  const categoryDefaultPersonal = !!state.categories.find((c) => c.id === form.categoryId)?.personalByDefault;
+  const effectivePersonal = form.split ? form.split === 'personal' : categoryDefaultPersonal;
+  const payerOwner = state.persons.find(
+    (p) => p.id === state.accounts.find((a) => a.id === form.accountId)?.ownerId,
+  );
+  const needsBeneficiary = effectivePersonal && !payerOwner?.isIndividual && !form.forPersonId;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +61,8 @@ export function RecurringForm({
       categoryId: form.type === 'transfer' ? undefined : form.categoryId,
       toAccountId: form.type === 'transfer' ? form.toAccountId : undefined,
       personId: form.type === 'income' ? form.personId : undefined,
+      split: form.type === 'expense' ? form.split : undefined,
+      forPersonId: form.type === 'expense' && effectivePersonal ? form.forPersonId : undefined,
     };
     dispatch({ type: 'recurring/save', recurring: clean });
     onDone();
@@ -174,6 +182,55 @@ export function RecurringForm({
           <input type="date" value={form.endDate ?? ''} onChange={(e) => set('endDate', e.target.value || undefined)} />
         </Field>
 
+
+        {form.type === 'expense' && (
+          <>
+            <Field
+              label="מתחלק באיזון?"
+              hint={
+                form.split
+                  ? undefined
+                  : categoryDefaultPersonal
+                    ? 'לפי הקטגוריה: אישית'
+                    : 'לפי הקטגוריה: משותפת'
+              }
+            >
+              <select
+                value={form.split ?? ''}
+                onChange={(e) => set('split', (e.target.value || undefined) as SplitKind | undefined)}
+              >
+                <option value="">לפי הקטגוריה</option>
+                <option value="shared">משותפת – נכללת באיזון</option>
+                <option value="personal">אישית – לא נכללת באיזון</option>
+              </select>
+            </Field>
+            {effectivePersonal && (
+              <Field
+                label="ההוצאה של"
+                hint={
+                  needsBeneficiary
+                    ? 'ההוצאה יוצאת מחשבון משותף – חובה לבחור, אחרת היא תיכלל באיזון'
+                    : 'ברירת מחדל: בעל החשבון שממנו שולמה'
+                }
+              >
+                <select
+                  value={form.forPersonId ?? ''}
+                  onChange={(e) => set('forPersonId', e.target.value || undefined)}
+                >
+                  <option value="">— לפי בעל החשבון —</option>
+                  {state.persons
+                    .filter((p) => p.isIndividual)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            )}
+          </>
+        )}
+
         <Field label="הערה" full>
           <input value={form.note ?? ''} onChange={(e) => set('note', e.target.value || undefined)} />
         </Field>
@@ -221,6 +278,12 @@ export function TxnForm({ initial, onDone, defaultMonth }: { initial?: Txn; onDo
   const categories = state.categories.filter(
     (c) => !c.archived && c.type === (form.type === 'income' ? 'income' : 'expense'),
   );
+  const categoryDefaultPersonal = !!state.categories.find((c) => c.id === form.categoryId)?.personalByDefault;
+  const effectivePersonal = form.split ? form.split === 'personal' : categoryDefaultPersonal;
+  const payerOwner = state.persons.find(
+    (p) => p.id === state.accounts.find((a) => a.id === form.accountId)?.ownerId,
+  );
+  const needsBeneficiary = effectivePersonal && !payerOwner?.isIndividual && !form.forPersonId;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -233,6 +296,8 @@ export function TxnForm({ initial, onDone, defaultMonth }: { initial?: Txn; onDo
         categoryId: form.type === 'transfer' ? undefined : form.categoryId,
         toAccountId: form.type === 'transfer' ? form.toAccountId : undefined,
         personId: form.type === 'income' ? form.personId : undefined,
+        split: form.type === 'expense' ? form.split : undefined,
+        forPersonId: form.type === 'expense' && effectivePersonal ? form.forPersonId : undefined,
       },
     });
     onDone();
@@ -304,6 +369,55 @@ export function TxnForm({ initial, onDone, defaultMonth }: { initial?: Txn; onDo
             </select>
           </Field>
         )}
+
+        {form.type === 'expense' && (
+          <>
+            <Field
+              label="מתחלק באיזון?"
+              hint={
+                form.split
+                  ? undefined
+                  : categoryDefaultPersonal
+                    ? 'לפי הקטגוריה: אישית'
+                    : 'לפי הקטגוריה: משותפת'
+              }
+            >
+              <select
+                value={form.split ?? ''}
+                onChange={(e) => set('split', (e.target.value || undefined) as SplitKind | undefined)}
+              >
+                <option value="">לפי הקטגוריה</option>
+                <option value="shared">משותפת – נכללת באיזון</option>
+                <option value="personal">אישית – לא נכללת באיזון</option>
+              </select>
+            </Field>
+            {effectivePersonal && (
+              <Field
+                label="ההוצאה של"
+                hint={
+                  needsBeneficiary
+                    ? 'ההוצאה יוצאת מחשבון משותף – חובה לבחור, אחרת היא תיכלל באיזון'
+                    : 'ברירת מחדל: בעל החשבון שממנו שולמה'
+                }
+              >
+                <select
+                  value={form.forPersonId ?? ''}
+                  onChange={(e) => set('forPersonId', e.target.value || undefined)}
+                >
+                  <option value="">— לפי בעל החשבון —</option>
+                  {state.persons
+                    .filter((p) => p.isIndividual)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            )}
+          </>
+        )}
+
         <Field label="הערה" full>
           <input value={form.note ?? ''} onChange={(e) => set('note', e.target.value || undefined)} />
         </Field>
@@ -437,6 +551,16 @@ export function CategoryForm({ initial, onDone }: { initial?: Category; onDone: 
             <option value="income">הכנסה</option>
           </select>
         </Field>
+        <div className="full">
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={!!form.personalByDefault}
+              onChange={(e) => set('personalByDefault', e.target.checked || undefined)}
+            />
+            קטגוריה אישית – ההוצאות בה לא נכללות באיזון
+          </label>
+        </div>
         <FieldGroup label="צבע" hint="משמש בגרף הקטגוריות וברשימות. ברירת מחדל = גוון לפי גודל ההוצאה" full>
           <ColorPicker value={form.color} onChange={(color) => set('color', color)} />
         </FieldGroup>

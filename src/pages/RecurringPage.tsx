@@ -3,7 +3,7 @@ import { useStore } from '../lib/store';
 import { useMoneyFormat } from '../lib/format';
 import { Card, ConfirmButton, EmptyState, Modal, Stat } from '../components/ui';
 import { RecurringForm } from '../components/forms';
-import { annualAmount, FREQUENCY_LABEL, monthlyEquivalent } from '../lib/compute';
+import { annualAmount, FREQUENCY_LABEL, monthlyEquivalent, resolveSplit } from '../lib/compute';
 import { accountColor } from '../lib/colors';
 import type { Recurring } from '../types';
 
@@ -163,6 +163,11 @@ export default function RecurringPage() {
                         <span className="name-cell">
                           <span>{r.name}</span>
                           {r.variable && <span className="pill muted">הערכה</span>}
+                          {r.type === 'expense' && resolveSplit(r, categoryById) === 'personal' && (
+                            <span className="pill muted" title="אישי – לא נכלל באיזון">
+                              אישי
+                            </span>
+                          )}
                           {!r.active && <span className="pill muted">מושהה</span>}
                         </span>
                         {r.note && <div className="sub muted small">{r.note}</div>}
