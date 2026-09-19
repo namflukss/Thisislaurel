@@ -10,7 +10,7 @@ function nf(locale: string, currency: string, digits: number, always = false): I
       currency,
       minimumFractionDigits: digits,
       maximumFractionDigits: digits,
-      ...(always ? { signDisplay: 'always' as const } : {}),
+      ...(always ? { signDisplay: 'exceptZero' as const } : {}),
     });
   }
   return fmtCache[key];
@@ -34,10 +34,12 @@ export function formatCompact(value: number, currency = '₪'): string {
   return `${sign}${Math.round(abs).toLocaleString('he-IL')} ${currency}`;
 }
 
-/** מציג תמיד סימן (+/−). Intl אחראי למיקום הסימן בשפה הנכונה. */
+/** מציג סימן (+/−) לכל ערך שאינו אפס. Intl אחראי למיקום הסימן בשפה הנכונה. */
 export function formatSigned(value: number, opts: { locale?: string; currency?: string } = {}): string {
   const { locale = 'he-IL', currency = 'ILS' } = opts;
-  return nf(locale, currency, 0, true).format(Math.round(value));
+  const rounded = Math.round(value);
+  // אפס שלילי אחרי עיגול לא צריך להופיע כ"-0"
+  return nf(locale, currency, 0, true).format(rounded === 0 ? 0 : rounded);
 }
 
 export function parseAmount(raw: string): number {

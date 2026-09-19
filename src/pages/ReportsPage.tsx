@@ -179,7 +179,7 @@ export default function ReportsPage({ ym }: { ym: string }) {
 
       <Card
         title="התחשבנות בין בני הבית"
-        subtitle={`${settlement.modeLabel} · מחושב על ${plural(months.length, 'חודש', 'חודשים')}. נכללות רק ההוצאות המשותפות; מה שסומן כאישי נשאר על מי שההוצאה שלו. ההוצאות מהחשבון המשותף מיוחסות לפי חלקו של כל אחד במימון החשבון.`}
+        subtitle={`${settlement.modeLabel} · מחושב על ${plural(months.length, 'חודש', 'חודשים')}. לכל הוצאה יש מי ששילמה אותה ומי שנושאת בה – וזה לא בהכרח אותו אדם. המאזן הוא ההפרש בין השניים.`}
       >
         <div className="table-wrap">
           <table className="data">
@@ -187,14 +187,13 @@ export default function ReportsPage({ ym }: { ym: string }) {
               <tr>
                 <th>שם</th>
                 <th className="num">הכנסות</th>
-                <th className="num">משותף ששולם מהפרטי</th>
-                <th className="num">הועבר למשותף</th>
-                <th className="num">חלק בהוצאות המשותפות</th>
-                <th className="num">סה״כ נשא</th>
-                <th className="num">החלק ההוגן</th>
-                <th className="num">אישי (לא באיזון)</th>
+                <th className="num">שילמה מהפרטי</th>
+                <th className="num">דרך המשותף</th>
+                <th className="num">החזרים והתאמות</th>
+                <th className="num">סה״כ שילמה</th>
+                <th className="num">נושאת ב-</th>
                 <th className="num">מאזן</th>
-                <th style={{ width: 120 }}>עודף / חוסר</th>
+                <th style={{ width: 110 }}>עודף / חוסר</th>
               </tr>
             </thead>
             <tbody>
@@ -208,16 +207,13 @@ export default function ReportsPage({ ym }: { ym: string }) {
                     </span>
                   </td>
                   <td className="num">{money(p.income)}</td>
-                  <td className="num">{money(p.sharedFromOwnAccount)}</td>
-                  <td className="num">{money(p.jointFunding)}</td>
-                  <td className="num">{money(p.jointShareAmount)}</td>
-                  <td className="num">{money(p.borne)}</td>
-                  <td className="num muted">{money(p.fairShare)}</td>
-                  <td className="num muted">
-                    {p.personalExpense ? money(p.personalExpense) : '—'}
-                    {p.personalFromJoint > 0 && (
-                      <div className="small muted">{money(p.personalFromJoint)} מהמשותף</div>
-                    )}
+                  <td className="num">{money(p.paidFromOwnAccount)}</td>
+                  <td className="num">{money(p.paidViaJoint)}</td>
+                  <td className="num">{p.settledShift ? signed(p.settledShift) : '—'}</td>
+                  <td className="num">{money(p.paid)}</td>
+                  <td className="num">
+                    {money(p.borne)}
+                    {p.personalBorne > 0 && <div className="small muted">{money(p.personalBorne)} אישי</div>}
                   </td>
                   <td className="num" style={{ color: p.balance >= 0 ? 'var(--income)' : 'var(--expense)', fontWeight: 700 }}>
                     {signed(p.balance)}
@@ -235,12 +231,13 @@ export default function ReportsPage({ ym }: { ym: string }) {
               <tr>
                 <td>סה״כ</td>
                 <td className="num">{money(income)}</td>
-                <td className="num">{money(settlement.sharedExpense - settlement.jointExpense)}</td>
-                <td className="num">{money(settlement.jointFundingTotal)}</td>
+                <td className="num">
+                  {money(settlement.persons.reduce((sum, p) => sum + p.paidFromOwnAccount, 0))}
+                </td>
                 <td className="num">{money(settlement.jointExpense)}</td>
-                <td className="num">{money(settlement.sharedExpense)}</td>
-                <td className="num">{money(settlement.sharedExpense)}</td>
-                <td className="num">{money(settlement.personalExpense)}</td>
+                <td className="num">—</td>
+                <td className="num">{money(settlement.totalExpense)}</td>
+                <td className="num">{money(settlement.totalExpense)}</td>
                 <td className="num">—</td>
                 <td />
               </tr>
@@ -248,13 +245,14 @@ export default function ReportsPage({ ym }: { ym: string }) {
           </table>
         </div>
 
-        {settlement.personalExpense > 0 && (
-          <p className="small muted" style={{ marginTop: 10, marginBottom: 0 }}>
-            מתוך {money(settlement.totalExpense)} הוצאות בתקופה, {money(settlement.personalExpense)} סומנו כאישיות
-            ואינן נכללות באיזון. סימון של תנועה בודדת נעשה בטופס שלה, וקטגוריה שלמה אפשר לסמן כאישית במסך
-            הקטגוריות.
-          </p>
-        )}
+        <p className="small muted" style={{ marginTop: 10, marginBottom: 0 }}>
+          מתוך {money(settlement.totalExpense)} הוצאות בתקופה,{' '}
+          {settlement.personalExpense > 0
+            ? `${money(settlement.personalExpense)} נושא בהן אדם אחד לבד`
+            : 'הכול מתחלק בין שתיכן'}
+          {settlement.settledTotal > 0 && ` · ${money(settlement.settledTotal)} כבר הועברו ביניכן`}. את אופן החלוקה
+          של כל שורה אפשר לשנות בתזרים החודשי או בטופס שלה.
+        </p>
 
         {settledRecord ? (
           <div className="tip settled" style={{ marginTop: 12 }}>
@@ -300,6 +298,8 @@ export default function ReportsPage({ ym }: { ym: string }) {
             החלוקה מאוזנת – אין צורך בהעברה בין בני הבית בתקופה זו.
           </div>
         )}
+
+        <AdjustmentsSection months={months} />
 
         {pastSettlements.length > 0 && (
           <div style={{ marginTop: 16 }}>
@@ -520,6 +520,148 @@ export default function ReportsPage({ ym }: { ym: string }) {
         </div>
       </Card>
     </>
+  );
+}
+
+/**
+ * התאמות ידניות לאיזון – מזומן, העברה שלא נרשמה, או הוצאה ששולמה עבור השנייה
+ * ולא נכנסה לאפליקציה. כל שורה מזיזה את המאזן ישירות.
+ */
+function AdjustmentsSection({ months }: { months: string[] }) {
+  const { state, dispatch } = useStore();
+  const { money } = useMoneyFormat();
+  const individuals = state.persons.filter((p) => p.isIndividual);
+  const personName = (id: string) => state.persons.find((p) => p.id === id)?.name ?? '';
+
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [fromPersonId, setFromPersonId] = useState(individuals[0]?.id ?? '');
+  const [toPersonId, setToPersonId] = useState(individuals[1]?.id ?? individuals[0]?.id ?? '');
+  const [date, setDate] = useState(todayISO());
+
+  const from = `${months[0]}-01`;
+  const to = `${months[months.length - 1]}-31`;
+  const rows = (state.adjustments ?? [])
+    .filter((a) => a.date >= from && a.date <= to)
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const value = Math.abs(Number(amount.replace(/[^\d.-]/g, ''))) || 0;
+  const valid = value > 0 && !!description.trim() && fromPersonId !== toPersonId;
+
+  const add = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!valid) return;
+    dispatch({
+      type: 'adjustment/save',
+      adjustment: {
+        id: newId('adj'),
+        date,
+        description: description.trim(),
+        amount: value,
+        fromPersonId,
+        toPersonId,
+      },
+    });
+    setDescription('');
+    setAmount('');
+  };
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <h3 style={{ fontSize: 14, marginBottom: 4 }}>התאמות ידניות</h3>
+      <p className="small muted" style={{ marginTop: 0 }}>
+        כל שורה כאן מזיזה את המאזן: מי שילמה או העבירה, ועבור מי. שימושי למזומן, להעברה שלא נרשמה
+        באפליקציה, או להוצאה ששולמה עבור השנייה.
+      </p>
+
+      <form onSubmit={add} className="toolbar" style={{ marginBottom: 10 }}>
+        <input
+          type="text"
+          placeholder="תיאור, למשל: מזומן עבור הגן"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          aria-label="תיאור ההתאמה"
+          style={{ minWidth: 190 }}
+        />
+        <input
+          inputMode="decimal"
+          placeholder="סכום"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          aria-label="סכום ההתאמה"
+          style={{ width: 96 }}
+        />
+        <select value={fromPersonId} onChange={(e) => setFromPersonId(e.target.value)} aria-label="מי שילמה">
+          {individuals.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} שילמה
+            </option>
+          ))}
+        </select>
+        <select value={toPersonId} onChange={(e) => setToPersonId(e.target.value)} aria-label="עבור מי">
+          {individuals.map((p) => (
+            <option key={p.id} value={p.id}>
+              עבור {p.name}
+            </option>
+          ))}
+        </select>
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="תאריך ההתאמה" />
+        <button type="submit" className="btn primary small" disabled={!valid}>
+          הוספה
+        </button>
+      </form>
+
+      {rows.length === 0 ? (
+        <p className="small muted" style={{ margin: 0 }}>
+          אין התאמות בתקופה הזו.
+        </p>
+      ) : (
+        <div className="table-wrap">
+          <table className="data">
+            <thead>
+              <tr>
+                <th>תאריך</th>
+                <th>תיאור</th>
+                <th>מי שילמה</th>
+                <th>עבור מי</th>
+                <th className="num">סכום</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((a) => (
+                <tr key={a.id}>
+                  <td className="small muted nums">{formatDate(a.date)}</td>
+                  <td>{a.description}</td>
+                  <td className="small">
+                    <span className="name-cell">
+                      <i className="swatch" style={{ background: personColor(state.persons, a.fromPersonId) }} />
+                      {personName(a.fromPersonId)}
+                    </span>
+                  </td>
+                  <td className="small">
+                    <span className="name-cell">
+                      <i className="swatch" style={{ background: personColor(state.persons, a.toPersonId) }} />
+                      {personName(a.toPersonId)}
+                    </span>
+                  </td>
+                  <td className="num">{money(a.amount)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn small ghost"
+                      onClick={() => dispatch({ type: 'adjustment/delete', id: a.id })}
+                    >
+                      מחיקה
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 

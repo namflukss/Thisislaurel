@@ -51,6 +51,12 @@ export function RecurringForm({
     (p) => p.id === state.accounts.find((a) => a.id === form.accountId)?.ownerId,
   );
   const needsBeneficiary = effectivePersonal && !payerOwner?.isIndividual && !form.forPersonId;
+  const individuals = state.persons.filter((p) => p.isIndividual);
+  const targetOwner = state.persons.find(
+    (p) => p.id === state.accounts.find((a) => a.id === form.toAccountId)?.ownerId,
+  );
+  const isBetweenPrivateAccounts =
+    !!payerOwner?.isIndividual && !!targetOwner?.isIndividual && payerOwner.id !== targetOwner.id;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +69,8 @@ export function RecurringForm({
       personId: form.type === 'income' ? form.personId : undefined,
       split: form.type === 'expense' ? form.split : undefined,
       forPersonId: form.type === 'expense' && effectivePersonal ? form.forPersonId : undefined,
+      shares: form.type === 'expense' && form.split === 'ratio' ? form.shares : undefined,
+      settles: form.type === 'transfer' ? form.settles : undefined,
     };
     dispatch({ type: 'recurring/save', recurring: clean });
     onDone();
@@ -186,30 +194,35 @@ export function RecurringForm({
         {form.type === 'expense' && (
           <>
             <Field
-              label="מתחלק באיזון?"
-              hint={
-                form.split
-                  ? undefined
-                  : categoryDefaultPersonal
-                    ? 'לפי הקטגוריה: אישית'
-                    : 'לפי הקטגוריה: משותפת'
-              }
+              label="איך ההוצאה מתחלקת?"
+              hint={form.split ? undefined : `לפי הקטגוריה: ${categoryDefaultPersonal ? 'אישית' : 'מתחלקת'}`}
             >
               <select
                 value={form.split ?? ''}
-                onChange={(e) => set('split', (e.target.value || undefined) as SplitKind | undefined)}
+                onChange={(e) => {
+                  const next = (e.target.value || undefined) as SplitKind | undefined;
+                  set('split', next);
+                  // מעבר לחלוקה לפי אחוזים מתחיל מחלוקה שווה
+                  if (next === 'ratio' && !form.shares) {
+                    const even = Math.round(100 / Math.max(individuals.length, 1));
+                    set('shares', Object.fromEntries(individuals.map((p) => [p.id, even])));
+                  }
+                }}
               >
                 <option value="">לפי הקטגוריה</option>
-                <option value="shared">משותפת – נכללת באיזון</option>
-                <option value="personal">אישית – לא נכללת באיזון</option>
+                <option value="shared">לפי שיטת החלוקה הכללית</option>
+                <option value="equal">חצי-חצי</option>
+                <option value="ratio">לפי אחוזים</option>
+                <option value="personal">אישית – של אחת מאיתנו</option>
               </select>
             </Field>
+
             {effectivePersonal && (
               <Field
                 label="ההוצאה של"
                 hint={
                   needsBeneficiary
-                    ? 'ההוצאה יוצאת מחשבון משותף – חובה לבחור, אחרת היא תיכלל באיזון'
+                    ? 'ההוצאה יוצאת מחשבון משותף – חובה לבחור, אחרת היא תתחלק כרגיל'
                     : 'ברירת מחדל: בעל החשבון שממנו שולמה'
                 }
               >
@@ -218,19 +231,44 @@ export function RecurringForm({
                   onChange={(e) => set('forPersonId', e.target.value || undefined)}
                 >
                   <option value="">— לפי בעל החשבון —</option>
-                  {state.persons
-                    .filter((p) => p.isIndividual)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
+                  {individuals.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
                 </select>
               </Field>
             )}
+
+            {form.split === 'ratio' &&
+              individuals.map((p) => (
+                <Field key={p.id} label={`חלקה של ${p.name} (%)`}>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={form.shares?.[p.id] ?? 0}
+                    onChange={(e) =>
+                      set('shares', { ...(form.shares ?? {}), [p.id]: Math.max(0, Number(e.target.value) || 0) })
+                    }
+                  />
+                </Field>
+              ))}
           </>
         )}
 
+        {form.type === 'transfer' && isBetweenPrivateAccounts && (
+          <div className="full">
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                checked={form.settles !== false}
+                onChange={(e) => set('settles', e.target.checked ? undefined : false)}
+              />
+              העברה זו מאזנת בינינו (מקטינה את מה שצריך להשלים)
+            </label>
+          </div>
+        )}
         <Field label="הערה" full>
           <input value={form.note ?? ''} onChange={(e) => set('note', e.target.value || undefined)} />
         </Field>
@@ -284,6 +322,12 @@ export function TxnForm({ initial, onDone, defaultMonth }: { initial?: Txn; onDo
     (p) => p.id === state.accounts.find((a) => a.id === form.accountId)?.ownerId,
   );
   const needsBeneficiary = effectivePersonal && !payerOwner?.isIndividual && !form.forPersonId;
+  const individuals = state.persons.filter((p) => p.isIndividual);
+  const targetOwner = state.persons.find(
+    (p) => p.id === state.accounts.find((a) => a.id === form.toAccountId)?.ownerId,
+  );
+  const isBetweenPrivateAccounts =
+    !!payerOwner?.isIndividual && !!targetOwner?.isIndividual && payerOwner.id !== targetOwner.id;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,6 +342,8 @@ export function TxnForm({ initial, onDone, defaultMonth }: { initial?: Txn; onDo
         personId: form.type === 'income' ? form.personId : undefined,
         split: form.type === 'expense' ? form.split : undefined,
         forPersonId: form.type === 'expense' && effectivePersonal ? form.forPersonId : undefined,
+        shares: form.type === 'expense' && form.split === 'ratio' ? form.shares : undefined,
+        settles: form.type === 'transfer' ? form.settles : undefined,
       },
     });
     onDone();
@@ -373,30 +419,35 @@ export function TxnForm({ initial, onDone, defaultMonth }: { initial?: Txn; onDo
         {form.type === 'expense' && (
           <>
             <Field
-              label="מתחלק באיזון?"
-              hint={
-                form.split
-                  ? undefined
-                  : categoryDefaultPersonal
-                    ? 'לפי הקטגוריה: אישית'
-                    : 'לפי הקטגוריה: משותפת'
-              }
+              label="איך ההוצאה מתחלקת?"
+              hint={form.split ? undefined : `לפי הקטגוריה: ${categoryDefaultPersonal ? 'אישית' : 'מתחלקת'}`}
             >
               <select
                 value={form.split ?? ''}
-                onChange={(e) => set('split', (e.target.value || undefined) as SplitKind | undefined)}
+                onChange={(e) => {
+                  const next = (e.target.value || undefined) as SplitKind | undefined;
+                  set('split', next);
+                  // מעבר לחלוקה לפי אחוזים מתחיל מחלוקה שווה
+                  if (next === 'ratio' && !form.shares) {
+                    const even = Math.round(100 / Math.max(individuals.length, 1));
+                    set('shares', Object.fromEntries(individuals.map((p) => [p.id, even])));
+                  }
+                }}
               >
                 <option value="">לפי הקטגוריה</option>
-                <option value="shared">משותפת – נכללת באיזון</option>
-                <option value="personal">אישית – לא נכללת באיזון</option>
+                <option value="shared">לפי שיטת החלוקה הכללית</option>
+                <option value="equal">חצי-חצי</option>
+                <option value="ratio">לפי אחוזים</option>
+                <option value="personal">אישית – של אחת מאיתנו</option>
               </select>
             </Field>
+
             {effectivePersonal && (
               <Field
                 label="ההוצאה של"
                 hint={
                   needsBeneficiary
-                    ? 'ההוצאה יוצאת מחשבון משותף – חובה לבחור, אחרת היא תיכלל באיזון'
+                    ? 'ההוצאה יוצאת מחשבון משותף – חובה לבחור, אחרת היא תתחלק כרגיל'
                     : 'ברירת מחדל: בעל החשבון שממנו שולמה'
                 }
               >
@@ -405,19 +456,44 @@ export function TxnForm({ initial, onDone, defaultMonth }: { initial?: Txn; onDo
                   onChange={(e) => set('forPersonId', e.target.value || undefined)}
                 >
                   <option value="">— לפי בעל החשבון —</option>
-                  {state.persons
-                    .filter((p) => p.isIndividual)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
+                  {individuals.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
                 </select>
               </Field>
             )}
+
+            {form.split === 'ratio' &&
+              individuals.map((p) => (
+                <Field key={p.id} label={`חלקה של ${p.name} (%)`}>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={form.shares?.[p.id] ?? 0}
+                    onChange={(e) =>
+                      set('shares', { ...(form.shares ?? {}), [p.id]: Math.max(0, Number(e.target.value) || 0) })
+                    }
+                  />
+                </Field>
+              ))}
           </>
         )}
 
+        {form.type === 'transfer' && isBetweenPrivateAccounts && (
+          <div className="full">
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                checked={form.settles !== false}
+                onChange={(e) => set('settles', e.target.checked ? undefined : false)}
+              />
+              העברה זו מאזנת בינינו (מקטינה את מה שצריך להשלים)
+            </label>
+          </div>
+        )}
         <Field label="הערה" full>
           <input value={form.note ?? ''} onChange={(e) => set('note', e.target.value || undefined)} />
         </Field>

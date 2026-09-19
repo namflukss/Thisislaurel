@@ -3,9 +3,9 @@ import { useStore } from '../lib/store';
 import { useMoneyFormat } from '../lib/format';
 import { Card, ConfirmButton, EmptyState, Field, Modal, Stat } from '../components/ui';
 import { TxnForm } from '../components/forms';
-import { buildLedger, personalBeneficiary, resolveSplit, summarizeMonth } from '../lib/compute';
+import { buildLedger, resolveSplit, splitLabel, summarizeMonth } from '../lib/compute';
 import { formatDate, monthLabel } from '../lib/dates';
-import { accountColor, personColor, STATUS_LABEL, TYPE_LABEL } from '../lib/colors';
+import { accountColor, STATUS_LABEL, TYPE_LABEL } from '../lib/colors';
 import type { LedgerEntry, OccurrenceStatus, SplitKind, Txn } from '../types';
 
 export default function MonthlyFlow({ ym }: { ym: string }) {
@@ -40,27 +40,35 @@ export default function MonthlyFlow({ ym }: { ym: string }) {
     dispatch({ type: 'override/set', recurringId: e.recurringId, ym, patch: { status } });
   };
 
-  /** סימון שורה כמשותפת או כאישית. בשורה קבועה השינוי חל על כל החודשים. */
-  const applySplit = (e: LedgerEntry, split: SplitKind, forPersonId?: string) => {
+  /** קביעת אופן החלוקה של שורה. בשורה קבועה השינוי חל על כל החודשים. */
+  const applySplit = (
+    e: LedgerEntry,
+    split: SplitKind,
+    forPersonId?: string,
+    shares?: Record<string, number>,
+  ) => {
     if (e.txnId) {
       const txn = state.txns.find((t) => t.id === e.txnId);
-      if (txn) dispatch({ type: 'txn/save', txn: { ...txn, split, forPersonId } });
+      if (txn) dispatch({ type: 'txn/save', txn: { ...txn, split, forPersonId, shares } });
     } else if (e.recurringId) {
       const rec = state.recurring.find((r) => r.id === e.recurringId);
-      if (rec) dispatch({ type: 'recurring/save', recurring: { ...rec, split, forPersonId } });
+      if (rec) dispatch({ type: 'recurring/save', recurring: { ...rec, split, forPersonId, shares } });
     }
   };
 
-  const toggleSplit = (e: LedgerEntry) => {
-    if (resolveSplit(e, categoryById) === 'personal') {
-      applySplit(e, 'shared', undefined);
-      return;
+  const clearSplit = (e: LedgerEntry) => {
+    if (e.txnId) {
+      const txn = state.txns.find((t) => t.id === e.txnId);
+      if (txn) dispatch({ type: 'txn/save', txn: { ...txn, split: undefined, forPersonId: undefined, shares: undefined } });
+    } else if (e.recurringId) {
+      const rec = state.recurring.find((r) => r.id === e.recurringId);
+      if (rec) {
+        dispatch({
+          type: 'recurring/save',
+          recurring: { ...rec, split: undefined, forPersonId: undefined, shares: undefined },
+        });
+      }
     }
-    // הוצאה מחשבון משותף – צריך לדעת של מי היא, אחרת אין למי לייחס אותה
-    const owner = state.accounts.find((a) => a.id === e.accountId)?.ownerId;
-    const ownerIsIndividual = state.persons.find((p) => p.id === owner)?.isIndividual;
-    if (ownerIsIndividual) applySplit(e, 'personal', undefined);
-    else setAttributing(e);
   };
 
   const resetOverride = (e: LedgerEntry) => {
@@ -149,28 +157,25 @@ export default function MonthlyFlow({ ym }: { ym: string }) {
                         <span className="name-cell">
                           <span>{e.name}</span>
                           {e.variable && <span className="pill muted small">הערכה</span>}
-                          {e.type === 'expense' && resolveSplit(e, categoryById) === 'personal' && (
-                            personalBeneficiary(e, categoryById, state.accounts, state.persons) ? (
-                              <span className="pill muted small" title="אישי – לא נכלל באיזון">
-                                אישי ·{' '}
-                                {
-                                  state.persons.find(
-                                    (x) =>
-                                      x.id === personalBeneficiary(e, categoryById, state.accounts, state.persons),
-                                  )?.name
-                                }
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                className="pill warn-pill small"
-                                onClick={() => setAttributing(e)}
-                                title="סומן כאישי אך לא ידוע של מי – עד שייבחר, ההוצאה נכללת באיזון"
-                              >
-                                אישי · חסר שיוך
-                              </button>
-                            )
-                          )}
+                          {e.type === 'expense' &&
+                            (() => {
+                              const label = splitLabel(e, categoryById, state.accounts, state.persons);
+                              if (!label) return null;
+                              return label === 'אישי · חסר שיוך' ? (
+                                <button
+                                  type="button"
+                                  className="pill warn-pill small"
+                                  onClick={() => setAttributing(e)}
+                                  title="סומן כאישי אך לא ידוע של מי – עד שייבחר, ההוצאה מתחלקת כרגיל"
+                                >
+                                  {label}
+                                </button>
+                              ) : (
+                                <span className="pill muted small" title="אופן החלוקה של ההוצאה">
+                                  {label}
+                                </span>
+                              );
+                            })()}
                         </span>
                         {e.note && <div className="sub muted small">{e.note}</div>}
                       </td>
@@ -195,14 +200,14 @@ export default function MonthlyFlow({ ym }: { ym: string }) {
                             <button
                               type="button"
                               className="btn small ghost"
-                              onClick={() => toggleSplit(e)}
+                              onClick={() => setAttributing(e)}
                               title={
                                 e.source === 'recurring'
-                                  ? 'החלפה בין משותף לאישי – חל על כל החודשים של החיוב הקבוע'
-                                  : 'החלפה בין משותף לאישי'
+                                  ? 'קביעת אופן החלוקה – חל על כל החודשים של החיוב הקבוע'
+                                  : 'קביעת אופן החלוקה של ההוצאה'
                               }
                             >
-                              {resolveSplit(e, categoryById) === 'personal' ? 'למשותף' : 'לאישי'}
+                              חלוקה
                             </button>
                           )}
                           {e.source === 'recurring' ? (
@@ -268,35 +273,16 @@ export default function MonthlyFlow({ ym }: { ym: string }) {
       </Card>
 
       {attributing && (
-        <Modal title={`של מי ההוצאה? – ${attributing.name}`} onClose={() => setAttributing(null)}>
-          <p className="small muted" style={{ marginTop: 0 }}>
-            ההוצאה שולמה מ{state.accounts.find((a) => a.id === attributing.accountId)?.name}, ולכן צריך לדעת של מי
-            היא כדי להוציא אותה מהאיזון. מי שנבחר יישא בה לבד.
-            {attributing.source === 'recurring' && ' השינוי חל על כל החודשים של החיוב הקבוע.'}
-          </p>
-          <div className="toolbar">
-            {state.persons
-              .filter((p) => p.isIndividual)
-              .map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="btn"
-                  onClick={() => {
-                    applySplit(attributing, 'personal', p.id);
-                    setAttributing(null);
-                  }}
-                >
-                  <i className="swatch" style={{ background: personColor(state.persons, p.id) }} />
-                  {p.name}
-                </button>
-              ))}
-            <span className="spacer" />
-            <button type="button" className="btn ghost" onClick={() => setAttributing(null)}>
-              ביטול
-            </button>
-          </div>
-        </Modal>
+        <SplitPicker
+          entry={attributing}
+          current={resolveSplit(attributing, categoryById)}
+          onClose={() => setAttributing(null)}
+          onPick={(split, forPersonId, shares) => {
+            if (split === null) clearSplit(attributing);
+            else applySplit(attributing, split, forPersonId, shares);
+            setAttributing(null);
+          }}
+        />
       )}
 
       {amountEdit && (
@@ -361,6 +347,104 @@ function AmountOverrideModal({
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+/** בחירת אופן החלוקה של הוצאה אחת, ישר מהתזרים */
+function SplitPicker({
+  entry,
+  current,
+  onClose,
+  onPick,
+}: {
+  entry: LedgerEntry;
+  current: SplitKind;
+  onClose: () => void;
+  onPick: (split: SplitKind | null, forPersonId?: string, shares?: Record<string, number>) => void;
+}) {
+  const { state } = useStore();
+  const individuals = state.persons.filter((p) => p.isIndividual);
+  const account = state.accounts.find((a) => a.id === entry.accountId);
+  const [shares, setShares] = useState<Record<string, number>>(
+    entry.shares ?? Object.fromEntries(individuals.map((p) => [p.id, Math.round(100 / Math.max(individuals.length, 1))])),
+  );
+  const sharesTotal = individuals.reduce((sum, p) => sum + (shares[p.id] ?? 0), 0);
+
+  const option = (label: string, hint: string, active: boolean, onClick: () => void) => (
+    <button
+      type="button"
+      key={label}
+      className="split-option"
+      aria-pressed={active}
+      onClick={onClick}
+      style={active ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)' } : undefined}
+    >
+      <strong>{label}</strong>
+      <span className="small muted">{hint}</span>
+    </button>
+  );
+
+  return (
+    <Modal title={`איך מתחלקת ההוצאה? – ${entry.name}`} onClose={onClose}>
+      <p className="small muted" style={{ marginTop: 0 }}>
+        שולמה מ{account?.name}. מי שילמה זה דבר אחד, ומי נושאת בהוצאה זה דבר אחר – כאן קובעים את השני.
+        {entry.source === 'recurring' && ' השינוי חל על כל החודשים של החיוב הקבוע.'}
+      </p>
+
+      <div className="split-options">
+        {option('לפי הקטגוריה', 'חוזר לברירת המחדל של הקטגוריה', !entry.split, () => onPick(null))}
+        {option(
+          'לפי שיטת החלוקה הכללית',
+          'לפי מה שנקבע בהגדרות (שווה / יחסי להכנסות)',
+          entry.split === 'shared',
+          () => onPick('shared'),
+        )}
+        {option('חצי-חצי', 'שתיכן נושאות בחלקים שווים', entry.split === 'equal', () => onPick('equal'))}
+        {individuals.map((p) =>
+          option(
+            `אישית של ${p.name}`,
+            `${p.name} נושאת בהוצאה במלואה`,
+            current === 'personal' && (entry.forPersonId === p.id || (!entry.forPersonId && account?.ownerId === p.id)),
+            () => onPick('personal', p.id),
+          ),
+        )}
+      </div>
+
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+        <div className="row-between" style={{ marginBottom: 8 }}>
+          <strong style={{ fontSize: 14 }}>לפי אחוזים</strong>
+          <span className="small muted">סה״כ {sharesTotal}%</span>
+        </div>
+        <div className="form-grid">
+          {individuals.map((p) => (
+            <Field key={p.id} label={`${p.name} (%)`}>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={shares[p.id] ?? 0}
+                onChange={(ev) => setShares({ ...shares, [p.id]: Math.max(0, Number(ev.target.value) || 0) })}
+              />
+            </Field>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="btn small"
+          style={{ marginTop: 8 }}
+          disabled={sharesTotal <= 0}
+          onClick={() => onPick('ratio', undefined, shares)}
+        >
+          שמירת החלוקה באחוזים
+        </button>
+      </div>
+
+      <div className="modal-actions">
+        <button type="button" className="btn ghost" onClick={onClose}>
+          סגירה
+        </button>
+      </div>
     </Modal>
   );
 }

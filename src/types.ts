@@ -3,11 +3,14 @@
 export type EntryType = 'expense' | 'income' | 'transfer';
 
 /**
- * האם ההוצאה מתחלקת בין בני הבית או שהיא אישית.
- * 'shared' – נכללת באיזון; 'personal' – מי שההוצאה שלו נושא בה לבד.
- * ריק = לפי הגדרת הקטגוריה, שברירת המחדל שלה היא משותפת.
+ * איך ההוצאה מתחלקת בין בני הבית – בנפרד לגמרי מהשאלה מאיזה חשבון היא שולמה.
+ * 'shared'   – לפי שיטת החלוקה הכללית שנבחרה בהגדרות
+ * 'equal'    – חלוקה שווה בין בני הבית (חצי-חצי לשניים)
+ * 'personal' – אדם אחד נושא בהוצאה במלואה
+ * 'ratio'    – חלוקה לפי אחוזים שנקבעים בשורה עצמה (shares)
+ * ריק = לפי הגדרת הקטגוריה, שברירת המחדל שלה היא 'shared'.
  */
-export type SplitKind = 'shared' | 'personal';
+export type SplitKind = 'shared' | 'equal' | 'personal' | 'ratio';
 
 /** תדירות של תנועה קבועה */
 export type Frequency =
@@ -82,10 +85,14 @@ export interface Recurring {
   active: boolean;
   /** סכום משתנה (חשמל, סופר) – מוצג כהערכה */
   variable?: boolean;
-  /** האם ההוצאה מתחלקת באיזון. ריק = לפי הקטגוריה */
+  /** איך ההוצאה מתחלקת. ריק = לפי הקטגוריה */
   split?: SplitKind;
   /** של מי ההוצאה האישית. ריק = בעל החשבון שממנו שולמה */
   forPersonId?: string;
+  /** אחוזים לפי personId, בשימוש כאשר split === 'ratio' */
+  shares?: Record<string, number>;
+  /** להעברה בין חשבונות פרטיים: האם היא מאזנת בין בני הבית. ריק = כן */
+  settles?: boolean;
   note?: string;
 }
 
@@ -100,10 +107,14 @@ export interface Txn {
   accountId: string;
   toAccountId?: string;
   personId?: string;
-  /** האם ההוצאה מתחלקת באיזון. ריק = לפי הקטגוריה */
+  /** איך ההוצאה מתחלקת. ריק = לפי הקטגוריה */
   split?: SplitKind;
   /** של מי ההוצאה האישית. ריק = בעל החשבון שממנו שולמה */
   forPersonId?: string;
+  /** אחוזים לפי personId, בשימוש כאשר split === 'ratio' */
+  shares?: Record<string, number>;
+  /** להעברה בין חשבונות פרטיים: האם היא מאזנת בין בני הבית. ריק = כן */
+  settles?: boolean;
   note?: string;
 }
 
@@ -136,6 +147,21 @@ export interface SettlementRecord {
   note?: string;
 }
 
+/**
+ * התאמה ידנית לאיזון: "X העבירה / שילמה סכום עבור Y".
+ * מקטינה את מה ש-X חייבת ומגדילה את מה ש-Y חייבת, בלי קשר להוצאות שנרשמו.
+ */
+export interface SettlementAdjustment {
+  id: string;
+  date: string; // YYYY-MM-DD
+  description: string;
+  amount: number;
+  /** מי העבירה / שילמה */
+  fromPersonId: string;
+  /** עבור מי */
+  toPersonId: string;
+}
+
 export type SplitMode = 'equal' | 'income' | 'custom';
 
 export interface Settings {
@@ -161,6 +187,8 @@ export interface AppState {
   overrides: Overrides;
   /** איזונים שכבר בוצעו בין בני הבית */
   settlements: SettlementRecord[];
+  /** התאמות ידניות לאיזון */
+  adjustments: SettlementAdjustment[];
   settings: Settings;
 }
 
@@ -182,5 +210,7 @@ export interface LedgerEntry {
   variable?: boolean;
   split?: SplitKind;
   forPersonId?: string;
+  shares?: Record<string, number>;
+  settles?: boolean;
   note?: string;
 }

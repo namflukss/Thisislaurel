@@ -224,6 +224,7 @@ export function buildSeedState(): AppState {
     txns: buildTxns(),
     overrides: {},
     settlements: [],
+    adjustments: [],
     settings: {
       householdName: 'משק הבית שלנו',
       currency: 'ILS',
@@ -243,6 +244,7 @@ export function emptyState(): AppState {
     txns: [],
     overrides: {},
     settlements: [],
+    adjustments: [],
     accounts: seed.accounts.map((a) => ({ ...a, openingBalance: 0, openingDate: todayISO() })),
   };
 }

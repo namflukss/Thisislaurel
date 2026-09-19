@@ -6,6 +6,7 @@ import type {
   Override,
   Person,
   Recurring,
+  SettlementAdjustment,
   SettlementRecord,
   Settings,
   Txn,
@@ -30,6 +31,8 @@ export type Action =
   | { type: 'override/set'; recurringId: string; ym: string; patch: Override | null }
   | { type: 'settlement/save'; record: SettlementRecord }
   | { type: 'settlement/delete'; id: string }
+  | { type: 'adjustment/save'; adjustment: SettlementAdjustment }
+  | { type: 'adjustment/delete'; id: string }
   | { type: 'settings/update'; patch: Partial<Settings> }
   | { type: 'state/replace'; state: AppState }
   | { type: 'state/reset'; mode: 'seed' | 'empty' };
@@ -103,6 +106,10 @@ export function reducer(state: AppState, action: Action): AppState {
         txns: record?.txnId ? state.txns.filter((t) => t.id !== record.txnId) : state.txns,
       };
     }
+    case 'adjustment/save':
+      return { ...state, adjustments: upsert(state.adjustments ?? [], action.adjustment) };
+    case 'adjustment/delete':
+      return { ...state, adjustments: (state.adjustments ?? []).filter((a) => a.id !== action.id) };
     case 'settings/update':
       return { ...state, settings: { ...state.settings, ...action.patch } };
     case 'state/replace':
@@ -134,7 +141,13 @@ function loadState(): AppState {
     if (!raw) return buildSeedState();
     const parsed = JSON.parse(raw);
     if (!isValidState(parsed)) return buildSeedState();
-    return { ...buildSeedState(), ...parsed, overrides: parsed.overrides ?? {}, settlements: parsed.settlements ?? [] };
+    return {
+      ...buildSeedState(),
+      ...parsed,
+      overrides: parsed.overrides ?? {},
+      settlements: parsed.settlements ?? [],
+      adjustments: parsed.adjustments ?? [],
+    };
   } catch {
     return buildSeedState();
   }
